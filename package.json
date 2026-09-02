@@ -4,16 +4,29 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:lan": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:notes": "node --experimental-strip-types --test lib/notes/notes.test.ts lib/auth/auth.test.ts lib/profile/profile.test.ts",
+    "build:cap": "node scripts/build-capacitor.mjs",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
+    "android": "pnpm build:cap && cap sync android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/local-notifications": "^8.3.1",
+    "axios": "^1.20.0",
+    "dexie": "^4.4.5",
+    "lucide-react": "^1.38.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
