@@ -23,6 +23,13 @@ export const uniqueLabels = (notes: Note[]) => {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b))
 }
 
+export const uniqueColors = (notes: Note[]) => {
+  const values = notes
+    .filter((note) => !note.archived && !note.trashedAt && note.color)
+    .map((note) => note.color)
+  return [...new Set(values)]
+}
+
 export const restoreNote = (notes: Note[], note: Note) => {
   if (notes.some((item) => item.id === note.id)) return notes
   return [...notes, note]
@@ -59,6 +66,7 @@ export const visibleNotes = ({
   notebookId,
   tag,
   label,
+  color,
   today,
   ownerEmail,
 }: {
@@ -69,6 +77,7 @@ export const visibleNotes = ({
   notebookId: string | null
   tag: string | null
   label?: string | null
+  color?: string | null
   today?: string
   ownerEmail?: string
 }) => {
@@ -89,6 +98,7 @@ export const visibleNotes = ({
       if (notebookId && note.notebookId !== notebookId) return false
       if (tag && note.tag.trim() !== tag) return false
       if (label && !note.labels.includes(label)) return false
+      if (color && note.color !== color) return false
       if (!query) return true
       return [
         note.title,

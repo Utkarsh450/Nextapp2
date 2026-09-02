@@ -3,7 +3,7 @@
 import { memo, useState, type ReactNode } from 'react'
 import { Archive, Bookmark, Copy, MoreHorizontal, Pin, RotateCcw, Trash2 } from 'lucide-react'
 import PaytmTick from '@/components/ui/PaytmTick'
-import { cardBodyPreview, checklistProgress, dueLabel, highlightSegments, type Note } from '@/lib/notes'
+import { cardBodyPreview, checklistProgress, dueLabel, highlightSegments, labelTint, type Note } from '@/lib/notes'
 
 function NoteCard({
   note,
@@ -69,11 +69,17 @@ function NoteCard({
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 text-[0.7rem] text-zinc-700/80">
         {note.notebook && <span className="rounded-full bg-white/50 px-2 py-0.5">{note.notebook}</span>}
         {tasks.total > 0 && (
-          <span className="rounded-full bg-white/50 px-2 py-0.5">{tasks.done}/{tasks.total}</span>
+          <span className="rounded-full bg-white/50 px-2 py-0.5">{tasks.done}/{tasks.total} done</span>
         )}
-        {due && <span className="rounded-full bg-white/50 px-2 py-0.5">{due}</span>}
-        {note.labels.slice(0, 2).map((item) => (
-          <span key={item} className="rounded-full bg-white/50 px-2 py-0.5">{item}</span>
+        {due && (
+          <span
+            className={`rounded-full px-2 py-0.5 ${due === 'Overdue' ? 'bg-red-500/25 text-red-900' : 'bg-white/50'}`}
+          >
+            {due}
+          </span>
+        )}
+        {note.labels.slice(0, 3).map((item) => (
+          <span key={item} className="rounded-full px-2 py-0.5" style={{ backgroundColor: `${labelTint(item)}99` }}>{item}</span>
         ))}
       </div>
       {menu && (

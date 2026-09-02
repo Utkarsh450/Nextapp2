@@ -29,6 +29,7 @@ export {
   uniqueNotebooks,
   uniqueTags,
   uniqueLabels,
+  uniqueColors,
   restoreNote,
   moveNote,
   trashNote,
@@ -36,6 +37,7 @@ export {
   visibleNotes,
   upcomingReminders,
 } from './filters'
+export { LABEL_PRESETS, labelTint } from './labels'
 export { NOTE_TEMPLATES, applyTemplate, dailyNoteTitle, findDailyNote, templateFromSaved } from './templates'
 export { createSampleNotes } from './seed'
 export { DEFAULT_NOTEBOOKS, defaultNotebooksFor, ensureNotebooks, createNotebook, renameNotebook, notebookById } from './notebooks'

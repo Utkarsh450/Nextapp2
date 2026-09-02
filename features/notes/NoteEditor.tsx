@@ -12,9 +12,11 @@ import {
 import { useRef, useState } from 'react'
 import {
   NOTE_COLORS,
+  LABEL_PRESETS,
   compressImageFile,
   insertChecklist,
   insertImageMarkdown,
+  labelTint,
   toggleTaskLine,
   wordCount,
   type Note,
@@ -56,9 +58,16 @@ export default function NoteEditor({
 }) {
   const [preview, setPreview] = useState(false)
   const [listening, setListening] = useState(false)
+  const [labelDraft, setLabelDraft] = useState('')
+  const [noteId, setNoteId] = useState(note.id)
   const imageRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const count = wordCount(`${note.title} ${note.body}`)
+
+  if (note.id !== noteId) {
+    setNoteId(note.id)
+    setLabelDraft('')
+  }
 
   const patch = (partial: Partial<Note>) => {
     onChange({ ...note, ...partial, preview: partial.preview ?? note.preview ?? partial.body?.slice(0, 80) ?? note.body.slice(0, 80) })
@@ -118,18 +127,61 @@ export default function NoteEditor({
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
-          <input
-            type="date"
-            value={note.dueAt ?? ''}
-            onChange={(event) => patch({ dueAt: event.target.value || null, remindAt: event.target.value || null })}
-            className="rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
-          />
-          <input
-            value={note.labels.join(', ')}
-            onChange={(event) => patch({ labels: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })}
-            placeholder="Labels, comma separated"
-            className="rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
-          />
+          <div className="sm:col-span-2">
+            <p className="mb-1 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Due date · reminder</p>
+            <input
+              type="date"
+              value={note.dueAt ?? ''}
+              onChange={(event) => patch({ dueAt: event.target.value || null, remindAt: event.target.value || note.remindAt })}
+              className="min-h-11 w-full rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Labels</p>
+          <div className="flex flex-wrap gap-2">
+            {note.labels.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="chip"
+                style={{ backgroundColor: `${labelTint(item)}99` }}
+                onClick={() => patch({ labels: note.labels.filter((label) => label !== item) })}
+              >
+                {item} ×
+              </button>
+            ))}
+          </div>
+          <form
+            className="flex gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const next = labelDraft.trim()
+              if (!next || note.labels.includes(next)) return
+              patch({ labels: [...note.labels, next] })
+              setLabelDraft('')
+            }}
+          >
+            <input
+              value={labelDraft}
+              onChange={(event) => setLabelDraft(event.target.value)}
+              placeholder="Add a label"
+              className="min-h-11 flex-1 rounded-2xl bg-white/60 px-3 text-sm outline-none dark:bg-white/5"
+            />
+            <button type="submit" className="chip">Add</button>
+          </form>
+          <div className="flex flex-wrap gap-2">
+            {LABEL_PRESETS.filter((item) => !note.labels.includes(item)).map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="chip"
+                onClick={() => patch({ labels: [...note.labels, item] })}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -163,7 +215,7 @@ export default function NoteEditor({
             {preview ? 'Edit' : 'Preview'}
           </button>
           <button type="button" onClick={() => onSaveTemplate(note)} className="chip">
-            Save template
+            Save as template
           </button>
         </div>
 

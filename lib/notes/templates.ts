@@ -53,4 +53,7 @@ export const templateFromSaved = (item: SavedTemplate) => ({
   notebookId: item.notebookId,
   body: item.body,
   preview: item.name,
+  color: item.color,
+  labels: item.labels ?? [],
+  dueAt: item.dueAt ?? null,
 })

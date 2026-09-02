@@ -68,6 +68,9 @@ export type SavedTemplate = {
   tag: string
   notebookId: string
   body: string
+  color?: string
+  labels?: string[]
+  dueAt?: string | null
   createdAt: number
 }
 

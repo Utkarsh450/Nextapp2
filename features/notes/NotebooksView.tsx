@@ -24,6 +24,12 @@ export default function NotebooksView({
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
 
+  const commitRename = (id: string) => {
+    const next = draft.trim()
+    if (next) onRename(id, next)
+    setEditing(null)
+  }
+
   return (
     <div className="px-4 pb-28">
       <form
@@ -69,25 +75,32 @@ export default function NotebooksView({
               className="flex min-h-[180px] flex-col rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-card)]"
               style={{ backgroundColor: notebook.color }}
             >
-              <button type="button" className="flex-1 text-left" onClick={() => onOpen(notebook.id)}>
-                <p className="text-[0.65rem] uppercase tracking-[0.14em] text-zinc-700/70">Notebook</p>
-                {editing === notebook.id ? (
+              {editing === notebook.id ? (
+                <div className="flex-1">
+                  <p className="text-[0.65rem] uppercase tracking-[0.14em] text-zinc-700/70">Notebook</p>
                   <input
                     autoFocus
                     value={draft}
-                    onClick={(event) => event.stopPropagation()}
                     onChange={(event) => setDraft(event.target.value)}
-                    onBlur={() => {
-                      onRename(notebook.id, draft)
-                      setEditing(null)
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        commitRename(notebook.id)
+                      }
+                      if (event.key === 'Escape') setEditing(null)
                     }}
+                    onBlur={() => commitRename(notebook.id)}
                     className="mt-2 w-full bg-transparent text-xl font-semibold outline-none"
                   />
-                ) : (
+                  <p className="mt-auto pt-6 text-sm text-zinc-700/80">{counts[notebook.id] ?? 0} notes</p>
+                </div>
+              ) : (
+                <button type="button" className="flex-1 text-left" onClick={() => onOpen(notebook.id)}>
+                  <p className="text-[0.65rem] uppercase tracking-[0.14em] text-zinc-700/70">Notebook</p>
                   <h2 className="mt-2 text-xl font-semibold tracking-tight">{notebook.name}</h2>
-                )}
-                <p className="mt-auto pt-6 text-sm text-zinc-700/80">{counts[notebook.id] ?? 0} notes</p>
-              </button>
+                  <p className="mt-auto pt-6 text-sm text-zinc-700/80">{counts[notebook.id] ?? 0} notes</p>
+                </button>
+              )}
               <div className="mt-3 flex items-center justify-between">
                 <button
                   type="button"
@@ -100,14 +113,14 @@ export default function NotebooksView({
                   Rename
                 </button>
                 <div className="flex gap-1">
-                  {NOTE_COLORS.slice(0, 5).map((item) => (
+                  {NOTE_COLORS.map((item) => (
                     <button
                       key={item}
                       type="button"
                       aria-label={`Color ${item}`}
                       onClick={() => onRecolor(notebook.id, item)}
                       className="h-4 w-4 rounded-full"
-                      style={{ backgroundColor: item }}
+                      style={{ backgroundColor: item, outline: notebook.color === item ? '2px solid var(--ink)' : undefined }}
                     />
                   ))}
                 </div>

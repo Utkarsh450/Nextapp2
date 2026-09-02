@@ -2,7 +2,7 @@
 
 import { Mic, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { applyTemplate, type TemplateKey } from '@/lib/notes'
+import { applyTemplate, type SavedTemplate, type TemplateKey } from '@/lib/notes'
 
 type SpeechRecognition = {
   lang: string
@@ -18,10 +18,14 @@ export default function CreateSheet({
   open,
   onClose,
   onCreate,
+  templates,
+  onUseTemplate,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (draft: { title: string; body: string; template?: TemplateKey }) => void
+  templates: SavedTemplate[]
+  onUseTemplate: (id: string) => void
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -107,6 +111,19 @@ export default function CreateSheet({
               className="chip"
             >
               {applyTemplate(key).name}
+            </button>
+          ))}
+          {templates.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                onUseTemplate(item.id)
+                onClose()
+              }}
+              className="chip"
+            >
+              {item.name}
             </button>
           ))}
           <button type="button" onClick={listen} className="chip">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyTemplate,
   createNotebook,
+  templateFromSaved,
   dailyNoteTitle,
   enqueueMutation,
   findDailyNote,
@@ -42,6 +43,7 @@ export const useNotes = (ownerEmail: string | null) => {
   const [notebookId, setNotebookId] = useState<string | null>(null)
   const [tag, setTag] = useState<string | null>(null)
   const [label, setLabel] = useState<string | null>(null)
+  const [color, setColor] = useState<string | null>(null)
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const skipPersist = useRef(true)
 
@@ -171,7 +173,20 @@ export const useNotes = (ownerEmail: string | null) => {
   }, [ownerEmail])
 
   const restoreTrashed = useCallback((id: number) => {
-    setNotes((current) => current.map((note) => (note.id === id ? restoreFromTrash(note) : note)))
+    setNotes((current) => {
+      const next = current.map((note) => (note.id === id ? restoreFromTrash(note) : note))
+      const restored = next.find((note) => note.id === id)
+      const at = reminderDate(restored?.remindAt || restored?.dueAt || null)
+      if (restored && at) {
+        void scheduleNoteReminder({
+          id: restored.id,
+          title: restored.title || 'Note reminder',
+          body: restored.preview || restored.body.slice(0, 80),
+          at,
+        })
+      }
+      return next
+    })
   }, [])
 
   const deleteForever = useCallback((id: number) => {
@@ -180,7 +195,10 @@ export const useNotes = (ownerEmail: string | null) => {
   }, [ownerEmail])
 
   const emptyTrash = useCallback(() => {
-    setNotes((current) => current.filter((note) => !note.trashedAt))
+    setNotes((current) => {
+      current.filter((note) => note.trashedAt).forEach((note) => void cancelNoteReminder(note.id))
+      return current.filter((note) => !note.trashedAt)
+    })
     void enqueueMutation(ownerEmail ?? '', 'trash.emptied', {})
   }, [ownerEmail])
 
@@ -222,6 +240,9 @@ export const useNotes = (ownerEmail: string | null) => {
       tag: note.tag,
       notebookId: note.notebookId,
       body: note.body,
+      color: note.color,
+      labels: [...note.labels],
+      dueAt: note.dueAt,
       createdAt: Date.now(),
     }
     setTemplates((current) => [template, ...current])
@@ -229,12 +250,17 @@ export const useNotes = (ownerEmail: string | null) => {
   }, [ownerEmail])
 
   const createFromSavedTemplate = useCallback((template: SavedTemplate) => {
+    const draft = templateFromSaved(template)
     return createBlank({
-      title: template.title,
-      tag: template.tag,
-      notebookId: template.notebookId,
-      body: template.body,
-      preview: template.name,
+      title: draft.title,
+      tag: draft.tag,
+      notebookId: draft.notebookId,
+      body: draft.body,
+      preview: draft.preview,
+      color: draft.color,
+      labels: draft.labels,
+      dueAt: draft.dueAt,
+      remindAt: draft.dueAt,
     })
   }, [createBlank])
 
@@ -266,6 +292,8 @@ export const useNotes = (ownerEmail: string | null) => {
     setTag,
     label,
     setLabel,
+    color,
+    setColor,
     saveNote,
     createBlank,
     createFromTemplate,

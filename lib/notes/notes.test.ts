@@ -1,16 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  applyTemplate,
-} from './templates.ts'
+import { applyTemplate, templateFromSaved } from './templates.ts'
 import { cardBodyPreview, checklistProgress, highlightSegments, insertChecklist, insertImageMarkdown, parseMarkdown, toggleTaskLine, wordCount } from './markdown.ts'
 import { createNotebook } from './notebooks.ts'
 import { createSampleNotes } from './seed.ts'
 import { exportNotesJson, exportNotesMarkdown, importNotesJson, parseNoteIdFromSearch, sharePath } from './export.ts'
 import { formatNoteTimestamp, isDueToday, isOverdue } from './dates.ts'
-import { moveNote, restoreFromTrash, restoreNote, trashNote, uniqueLabels, uniqueNotebooks, uniqueTags, upcomingReminders, visibleNotes } from './filters.ts'
+import { moveNote, restoreFromTrash, restoreNote, trashNote, uniqueColors, uniqueLabels, uniqueNotebooks, uniqueTags, upcomingReminders, visibleNotes } from './filters.ts'
 import { NOTE_COLORS, randomNoteColor } from './types.ts'
 import { normalizeNote } from './normalize.ts'
+import { LABEL_PRESETS, labelTint } from './labels.ts'
 
 test('normalize maps job-card fields onto note fields', () => {
   const note = normalizeNote({
@@ -38,6 +37,7 @@ test('sample notes are personal, pastel, and few', () => {
   assert.ok(notes.every((note) => note.ownerEmail === 'ada@notes.dev'))
   assert.ok(notes.some((note) => note.dueAt))
   assert.ok(notes.some((note) => NOTE_COLORS.includes(note.color as typeof NOTE_COLORS[number])))
+  assert.ok(notes.every((note) => note.labels.length > 0))
 })
 
 test('timestamp, preview, and random pastel color', () => {
@@ -242,4 +242,56 @@ test('upcoming reminders surface due notes', () => {
     normalizeNote({ id: 2, title: 'Later', dueAt: '2026-09-20' }, 1),
   ]
   assert.deepEqual(upcomingReminders(notes, '2026-09-01').map((note) => note.id), [1])
+})
+
+test('saved templates keep labels and color', () => {
+  const saved = templateFromSaved({
+    id: 'tpl-1',
+    ownerEmail: 'ada@notes.dev',
+    name: 'Weekly recap',
+    title: 'Weekly recap',
+    tag: 'Work',
+    notebookId: 'work',
+    body: '- [ ] Ship notes',
+    color: '#CDE0E8',
+    labels: ['Work'],
+    dueAt: '2026-09-08',
+    createdAt: 1,
+  })
+  assert.equal(saved.color, '#CDE0E8')
+  assert.deepEqual(saved.labels, ['Work'])
+  assert.equal(saved.dueAt, '2026-09-08')
+})
+
+test('label and color filters keep the board personal', () => {
+  const notes = [
+    normalizeNote({ id: 1, title: 'Green', color: '#D9E8A8', labels: ['Work'] }, 0, 'ada@notes.dev'),
+    normalizeNote({ id: 2, title: 'Pink', color: '#F9A8B6', labels: ['Life'] }, 1, 'ada@notes.dev'),
+  ]
+  const byLabel = visibleNotes({
+    notes,
+    search: '',
+    sortKey: 'newest',
+    filterKey: 'all',
+    notebookId: null,
+    tag: null,
+    label: 'Work',
+    ownerEmail: 'ada@notes.dev',
+  })
+  assert.deepEqual(byLabel.map((note) => note.id), [1])
+  const byColor = visibleNotes({
+    notes,
+    search: '',
+    sortKey: 'newest',
+    filterKey: 'all',
+    notebookId: null,
+    tag: null,
+    color: '#F9A8B6',
+    ownerEmail: 'ada@notes.dev',
+  })
+  assert.deepEqual(byColor.map((note) => note.id), [2])
+  assert.deepEqual(uniqueLabels(notes), ['Life', 'Work'])
+  assert.ok(uniqueColors(notes).includes('#D9E8A8'))
+  assert.ok(LABEL_PRESETS.includes('Work'))
+  assert.equal(NOTE_COLORS.includes(labelTint('Work') as typeof NOTE_COLORS[number]), true)
 })

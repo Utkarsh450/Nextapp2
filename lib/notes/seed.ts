@@ -16,7 +16,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       color: '#D9E8A8',
       body: '- [ ] Finish the afternoon walkthrough\n- [ ] Call the dentist\n- [x] Water the fern',
       pinned: true,
-      labels: ['today'],
+      labels: ['Today'],
     },
     {
       title: 'Weekend plans',
@@ -25,7 +25,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       notebookId: 'personal',
       color: '#F9A8B6',
       body: 'Saturday: morning hike at Eagle Peak.\nSunday: farmers market and a slow lunch.',
-      labels: ['life'],
+      labels: ['Personal'],
     },
     {
       title: 'To-do list',
@@ -36,7 +36,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       body: '- [ ] Buy groceries\n- [x] Send the weekly recap\n- [ ] Schedule car service\n- [ ] Read chapter 4',
       dueAt: today,
       remindAt: today,
-      labels: ['tasks'],
+      labels: ['Tasks'],
     },
     {
       title: 'Book ideas',
@@ -46,7 +46,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       color: '#F9B384',
       body: 'A city where memories are traded like currency.\nOpening scene: a rainy bus stop, two strangers, one ticket.',
       pinned: true,
-      labels: ['writing'],
+      labels: ['Ideas'],
     },
     {
       title: 'Pasta night',
@@ -55,7 +55,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       notebookId: 'journal',
       color: '#F9D368',
       body: 'Garlic, olive oil, chili flakes, parsley.\nToss spaghetti al dente. Finish with lemon zest.',
-      labels: ['kitchen'],
+      labels: ['Home'],
     },
     {
       title: 'Gift list',
@@ -66,7 +66,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       body: '• Mom — scarf\n• Dad — cookbook\n• Sister — wireless earbuds',
       dueAt: '2026-09-15',
       remindAt: '2026-09-15',
-      labels: ['family'],
+      labels: ['Personal'],
     },
     {
       title: 'Quotes',
@@ -75,6 +75,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       notebookId: 'ideas',
       color: '#B8E0D2',
       body: '"The secret of getting ahead is getting started." — Mark Twain\n\nSmall steps every day.',
+      labels: ['Ideas'],
     },
     {
       title: 'Morning routine',
@@ -84,7 +85,7 @@ export const createSampleNotes = (ownerEmail: string, now = Date.now()): Note[] 
       color: '#D9E8A8',
       body: 'Wake 6:30 · Stretch 10 min · Journal 5 min · No phone until breakfast.',
       confirmed: true,
-      labels: ['habits'],
+      labels: ['Today'],
     },
   ]
 
