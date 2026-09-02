@@ -9,11 +9,11 @@ import AppHeader from '@/features/shell/AppHeader'
 import AppTabs from '@/features/shell/AppTabs'
 import Fab from '@/features/shell/Fab'
 import { useNotes } from '@/hooks/useNotes'
+import { useOnline } from '@/hooks/useOnline'
 import { useSession, useTheme } from '@/hooks/useSession'
 import {
-  exportNotesJson,
   exportNotesMarkdown,
-  importNotesJson,
+  insertWikiLink,
   labelTint,
   uniqueColors,
   uniqueLabels,
@@ -24,6 +24,11 @@ import {
   type FilterKey,
   type Note,
 } from '@/lib/notes'
+import {
+  calendarAlertsAvailable,
+  enableCalendarAlerts,
+  watchReminderOpens,
+} from '@/lib/native/notifications'
 import {
   profileFromEmail,
   profileToAccountUser,
@@ -58,6 +63,7 @@ const download = (filename: string, text: string, type: string) => {
 export default function NotesApp() {
   const { session, loading, sendOtp, verifyOtp, logout } = useSession()
   const { theme, toggle } = useTheme()
+  const online = useOnline()
   const email = session?.email ?? ''
   const board = useNotes(session?.email ?? null)
   const [tab, setTab] = useState<AppTab>('notes')
@@ -69,6 +75,25 @@ export default function NotesApp() {
   const [templateDraft, setTemplateDraft] = useState('')
   const [savingTemplate, setSavingTemplate] = useState<Note | null>(null)
   const [emptyingTrash, setEmptyingTrash] = useState(false)
+  const pendingOpen = useRef<number | null>(null)
+
+  useEffect(() => {
+    return watchReminderOpens((id) => {
+      pendingOpen.current = id
+      setTab('notes')
+      setEditingId(id)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!board.ready || !email || pendingOpen.current == null) return
+    const id = pendingOpen.current
+    if (board.notes.some((note) => note.id === id)) {
+      pendingOpen.current = null
+      setEditingId(id)
+      setTab('notes')
+    }
+  }, [board.notes, board.ready, email])
 
   const account = profileToAccountUser(
     profile ?? (email ? (readStoredProfiles()[email] ?? profileFromEmail(email)) : profileFromEmail('you@notes.dev')),
@@ -169,6 +194,12 @@ export default function NotesApp() {
         onToggleTheme={toggle}
       />
 
+      {!online && (
+        <p className="mx-4 mb-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-[var(--ink)] ring-1 ring-black/5 dark:bg-white/5">
+          Offline · notes still save on this device
+        </p>
+      )}
+
       {tab === 'notes' && reminders.length > 0 && board.filterKey !== 'trash' && (
         <button
           type="button"
@@ -207,6 +238,18 @@ export default function NotesApp() {
           {board.notebookId && (
             <button type="button" className="chip" onClick={() => board.setNotebookId(null)}>
               All notebooks
+            </button>
+          )}
+          {board.filterKey !== 'trash' && (
+            <button
+              type="button"
+              className="chip whitespace-nowrap"
+              onClick={() => {
+                const note = board.openDailyNote()
+                setEditingId(note.id)
+              }}
+            >
+              Today&apos;s log
             </button>
           )}
           {colors.map((item) => (
@@ -358,20 +401,38 @@ export default function NotesApp() {
           onSave={saveProfile}
           onLogout={() => void logout()}
           onExportMarkdown={() => download('notes.md', exportNotesMarkdown(liveNotes), 'text/markdown')}
-          onExportJson={() => download('notes.json', exportNotesJson(liveNotes), 'application/json')}
+          onExportJson={() => {
+            void board.exportBackup().then((raw) => download('notes.json', raw, 'application/json'))
+          }}
           onOpenTrash={() => {
             board.setFilterKey('trash')
             setTab('notes')
           }}
           onImportJson={(raw) => {
-            try {
-              const merged = importNotesJson(raw, board.notes, email)
-              merged.filter((note) => !board.notes.some((item) => item.id === note.id)).forEach((note) => board.saveNote(note))
-              ping('Backup imported')
-            } catch {
-              ping('Could not import that file')
-            }
+            void board.importBackup(raw).then((count) => {
+              ping(count ? `Imported ${count} notes` : 'Nothing new to import')
+            }).catch(() => ping('Could not import that file'))
           }}
+          online={online}
+          pendingCount={board.pendingCount}
+          usageLabel={board.usageLabel}
+          persistError={board.persistError}
+          onEnableAlerts={
+            calendarAlertsAvailable()
+              ? () => {
+                  void enableCalendarAlerts().then((result) => {
+                    board.resyncReminders()
+                    ping(
+                      result.ok
+                        ? 'Phone alerts are on. Timed notes will ping like Calendar.'
+                        : result.reason === 'denied'
+                          ? 'Notifications are off. Allow them in Android settings.'
+                          : 'Alerts need the Android app.'
+                    )
+                  })
+                }
+              : undefined
+          }
         />
       )}
 
@@ -386,7 +447,15 @@ export default function NotesApp() {
           }
         }}
       />
-      <Fab hidden={Boolean(editing) || tab === 'you' || searchOpen} onClick={() => setCreateOpen(true)} />
+      <Fab
+        hidden={Boolean(editing) || tab === 'you' || searchOpen}
+        onClick={() => {
+          const note = board.createBlank()
+          setTab('notes')
+          setEditingId(note.id)
+        }}
+        onLongPress={() => setCreateOpen(true)}
+      />
       <Toast message={toast?.message ?? null} actionLabel={toast?.actionLabel} onAction={toast?.onAction} />
 
       <SearchOverlay
@@ -434,6 +503,7 @@ export default function NotesApp() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         templates={board.templates}
+        onVoiceMissing={() => ping('Voice is not available in this browser')}
         onUseTemplate={(id) => {
           const template = board.templates.find((item) => item.id === id)
           if (!template) return
@@ -453,6 +523,7 @@ export default function NotesApp() {
         <div className="fixed inset-0 z-50 bg-[var(--paper)]">
           <NoteEditor
             note={editing}
+            notes={board.notes}
             notebooks={board.notebooks}
             onChange={(note: Note) => board.saveNote(note)}
             onClose={() => setEditingId(null)}
@@ -460,6 +531,20 @@ export default function NotesApp() {
               setSavingTemplate(note)
               setTemplateDraft(note.title || 'Template')
             }}
+            onAddFiles={(files, intoBody) => {
+              void board.addFilesToNote(editing, files, intoBody)
+            }}
+            onRemoveAttachment={(id) => {
+              void board.removeAttachment(editing, id)
+            }}
+            onOpenNote={(id) => setEditingId(id)}
+            onCreateLinked={(title) => {
+              board.saveNote({ ...editing, body: insertWikiLink(editing.body, title) })
+              const created = board.createBlank({ title })
+              setEditingId(created.id)
+            }}
+            onExport={() => download(`${editing.title || 'note'}.md`, exportNotesMarkdown([editing]), 'text/markdown')}
+            onVoiceMissing={() => ping('Voice is not available in this browser')}
           />
         </div>
       )}

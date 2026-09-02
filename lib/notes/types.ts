@@ -24,8 +24,18 @@ export type Attachment = {
   id: string
   name: string
   mime: string
-  dataUrl: string
   createdAt: number
+  dataUrl?: string
+}
+
+export type BlobRecord = {
+  id: string
+  ownerEmail: string
+  noteId: number
+  name: string
+  mime: string
+  createdAt: number
+  blob: Blob
 }
 
 export type Note = {
@@ -46,6 +56,8 @@ export type Note = {
   trashedAt: number | null
   color: string
   dueAt: string | null
+  dueTime: string | null
+  alertMinutes: number
   remindAt: string | null
   labels: string[]
   attachments: Attachment[]
@@ -71,6 +83,8 @@ export type SavedTemplate = {
   color?: string
   labels?: string[]
   dueAt?: string | null
+  dueTime?: string | null
+  alertMinutes?: number
   createdAt: number
 }
 

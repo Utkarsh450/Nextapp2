@@ -1,9 +1,9 @@
 "use client"
 
 import { memo, useState, type ReactNode } from 'react'
-import { Archive, Bookmark, Copy, MoreHorizontal, Pin, RotateCcw, Trash2 } from 'lucide-react'
+import { Archive, Bookmark, Copy, MoreHorizontal, Paperclip, Pin, RotateCcw, Trash2 } from 'lucide-react'
 import PaytmTick from '@/components/ui/PaytmTick'
-import { cardBodyPreview, checklistProgress, dueLabel, highlightSegments, labelTint, type Note } from '@/lib/notes'
+import { cardBodyPreview, checklistProgress, formatDueChip, highlightSegments, labelTint, todayISO, type Note } from '@/lib/notes'
 
 function NoteCard({
   note,
@@ -31,7 +31,7 @@ function NoteCard({
   const [menu, setMenu] = useState(false)
   const preview = cardBodyPreview(note.body, note.preview)
   const tasks = checklistProgress(note.body)
-  const due = dueLabel(note.dueAt)
+  const due = formatDueChip(note.dueAt, note.dueTime, todayISO())
 
   return (
     <article
@@ -73,9 +73,14 @@ function NoteCard({
         )}
         {due && (
           <span
-            className={`rounded-full px-2 py-0.5 ${due === 'Overdue' ? 'bg-red-500/25 text-red-900' : 'bg-white/50'}`}
+            className={`rounded-full px-2 py-0.5 ${due.startsWith('Overdue') ? 'bg-red-500/25 text-red-900' : 'bg-white/50'}`}
           >
             {due}
+          </span>
+        )}
+        {note.attachments.length > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/50 px-2 py-0.5">
+            <Paperclip size={11} /> {note.attachments.length}
           </span>
         )}
         {note.labels.slice(0, 3).map((item) => (

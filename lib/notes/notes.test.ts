@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { applyTemplate, templateFromSaved } from './templates.ts'
+import { applyTemplate, dailyNoteTitle, findDailyNote, templateFromSaved } from './templates.ts'
 import { cardBodyPreview, checklistProgress, highlightSegments, insertChecklist, insertImageMarkdown, parseMarkdown, toggleTaskLine, wordCount } from './markdown.ts'
 import { createNotebook } from './notebooks.ts'
 import { createSampleNotes } from './seed.ts'
 import { exportNotesJson, exportNotesMarkdown, importNotesJson, parseNoteIdFromSearch, sharePath } from './export.ts'
 import { formatNoteTimestamp, isDueToday, isOverdue } from './dates.ts'
+import { formatDueChip, reminderFields, reminderFireDate } from './reminders.ts'
 import { moveNote, restoreFromTrash, restoreNote, trashNote, uniqueColors, uniqueLabels, uniqueNotebooks, uniqueTags, upcomingReminders, visibleNotes } from './filters.ts'
 import { NOTE_COLORS, randomNoteColor } from './types.ts'
-import { normalizeNote } from './normalize.ts'
+import { belongsToOwner, normalizeNote } from './normalize.ts'
 import { LABEL_PRESETS, labelTint } from './labels.ts'
+import { backlinksTo, findNoteByTitle, insertWikiLink, parseWikiLinks, wikiSegments } from './backlinks.ts'
+import { blobMarkdownSrc, collectBlobIds, dataUrlToBlob } from './blobs.ts'
+import { compactMutations, formatBytes, shouldEnqueue } from './queue.ts'
+import { isolateBundle, isolateNotes } from './isolation.ts'
 
 test('normalize maps job-card fields onto note fields', () => {
   const note = normalizeNote({
@@ -38,6 +43,8 @@ test('sample notes are personal, pastel, and few', () => {
   assert.ok(notes.some((note) => note.dueAt))
   assert.ok(notes.some((note) => NOTE_COLORS.includes(note.color as typeof NOTE_COLORS[number])))
   assert.ok(notes.every((note) => note.labels.length > 0))
+  assert.ok(notes.some((note) => note.body.includes('[[Quotes]]')))
+  assert.ok(notes.some((note) => note.body.includes('[[Book ideas]]')))
 })
 
 test('timestamp, preview, and random pastel color', () => {
@@ -244,6 +251,22 @@ test('upcoming reminders surface due notes', () => {
   assert.deepEqual(upcomingReminders(notes, '2026-09-01').map((note) => note.id), [1])
 })
 
+test('calendar reminders fire before a timed event', () => {
+  const lastWeek = Date.parse('2026-08-20T00:00:00')
+  const tenBefore = reminderFireDate('2026-09-02', '15:00', 10, lastWeek)
+  assert.equal(tenBefore?.getHours(), 14)
+  assert.equal(tenBefore?.getMinutes(), 50)
+  const allDay = reminderFireDate('2026-09-02', null, 0, lastWeek)
+  assert.equal(allDay?.getHours(), 9)
+  assert.equal(allDay?.getMinutes(), 0)
+  const dayBefore = reminderFireDate('2026-09-02', '09:00', 1440, lastWeek)
+  assert.equal(dayBefore?.getDate(), 1)
+  assert.equal(reminderFireDate('2026-09-02', '15:00', -1, lastWeek), null)
+  const fields = reminderFields({ dueAt: '2026-09-15', dueTime: '18:00', alertMinutes: 60 })
+  assert.equal(fields.remindAt, '2026-09-15T17:00')
+  assert.equal(formatDueChip('2026-09-15', '18:00', '2026-09-02'), 'Sep 15 · 6:00 PM')
+})
+
 test('saved templates keep labels and color', () => {
   const saved = templateFromSaved({
     id: 'tpl-1',
@@ -294,4 +317,66 @@ test('label and color filters keep the board personal', () => {
   assert.ok(uniqueColors(notes).includes('#D9E8A8'))
   assert.ok(LABEL_PRESETS.includes('Work'))
   assert.equal(NOTE_COLORS.includes(labelTint('Work') as typeof NOTE_COLORS[number]), true)
+})
+
+test('wiki links parse, insert, and resolve backlinks', () => {
+  const quotes = normalizeNote({ id: 1, title: 'Quotes', body: 'Hello' }, 0, 'ada@notes.dev')
+  const ideas = normalizeNote({ id: 2, title: 'Book ideas', body: 'See [[Quotes]] and [[Missing]]' }, 1, 'ada@notes.dev')
+  assert.deepEqual(parseWikiLinks(ideas.body), ['Quotes', 'Missing'])
+  assert.equal(findNoteByTitle([quotes, ideas], 'quotes')?.id, 1)
+  assert.deepEqual(backlinksTo(quotes, [quotes, ideas]).map((note) => note.id), [2])
+  assert.equal(insertWikiLink('Hello', 'Quotes'), 'Hello [[Quotes]]')
+  assert.deepEqual(wikiSegments('See [[Quotes]] now').map((part) => part.link), [null, 'Quotes', null])
+})
+
+test('blob refs stay out of the note document', () => {
+  const note = normalizeNote({
+    id: 9,
+    title: 'Photo',
+    body: `![cat](${blobMarkdownSrc('att-9-1')})`,
+    attachments: [{ id: 'att-9-2', name: 'scan.pdf', mime: 'application/pdf', createdAt: 1 }],
+  }, 0, 'ada@notes.dev')
+  assert.deepEqual(collectBlobIds(note).sort(), ['att-9-1', 'att-9-2'])
+  const blob = dataUrlToBlob('data:text/plain;base64,aGk=')
+  assert.equal(blob.type, 'text/plain')
+  assert.equal(cardBodyPreview(note.body), '')
+})
+
+test('daily note is found by today title', () => {
+  const title = dailyNoteTitle(new Date('2026-09-02T12:00:00'))
+  const notes = [normalizeNote({ id: 3, title, body: 'Wins' }, 0, 'ada@notes.dev')]
+  assert.equal(findDailyNote(notes, new Date('2026-09-02T18:00:00'))?.id, 3)
+  assert.equal(findDailyNote(notes, new Date('2026-09-01T18:00:00')), null)
+})
+
+test('accounts never mix notes across emails', () => {
+  const mixed = [
+    normalizeNote({ id: 1, title: 'Ada', ownerEmail: 'ada@notes.dev' }, 0, 'ada@notes.dev'),
+    normalizeNote({ id: 2, title: 'Sam', ownerEmail: 'sam@notes.dev' }, 1, 'sam@notes.dev'),
+  ]
+  assert.deepEqual(isolateNotes(mixed, 'ada@notes.dev').map((note) => note.id), [1])
+  assert.equal(belongsToOwner(mixed[1], 'ada@notes.dev'), false)
+  const bundle = isolateBundle({
+    notes: mixed,
+    notebooks: [
+      { id: 'inbox', ownerEmail: 'ada@notes.dev', name: 'Inbox', color: '#F9D368', createdAt: 1 },
+      { id: 'other', ownerEmail: 'sam@notes.dev', name: 'Other', color: '#F9A8B6', createdAt: 2 },
+    ],
+    templates: [],
+    recents: ['milk'],
+  }, 'ada@notes.dev')
+  assert.deepEqual(bundle.notebooks.map((item) => item.id), ['inbox'])
+})
+
+test('mutation queue ignores noise and keeps last write', () => {
+  assert.equal(shouldEnqueue('account.opened'), false)
+  assert.equal(shouldEnqueue('note.saved'), true)
+  const queued = compactMutations([
+    { ownerEmail: 'ada@notes.dev', kind: 'account.opened', payload: {}, createdAt: 1, synced: 0, id: 1 },
+    { ownerEmail: 'ada@notes.dev', kind: 'note.saved', payload: { id: 9 }, createdAt: 2, synced: 0, id: 2 },
+    { ownerEmail: 'ada@notes.dev', kind: 'note.saved', payload: { id: 9 }, createdAt: 3, synced: 0, id: 3 },
+    { ownerEmail: 'ada@notes.dev', kind: 'note.deleted', payload: { id: 9 }, createdAt: 4, synced: 0, id: 4 },
+  ])
+  assert.deepEqual(queued.map((item) => item.kind), ['note.deleted'])
+  assert.equal(formatBytes(2048), '2 KB')
 })

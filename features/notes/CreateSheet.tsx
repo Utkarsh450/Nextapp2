@@ -3,16 +3,7 @@
 import { Mic, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { applyTemplate, type SavedTemplate, type TemplateKey } from '@/lib/notes'
-
-type SpeechRecognition = {
-  lang: string
-  interimResults: boolean
-  continuous: boolean
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
-}
+import { appendSpoken, speechAvailable, startDictation } from '@/lib/native/speech'
 
 export default function CreateSheet({
   open,
@@ -20,12 +11,14 @@ export default function CreateSheet({
   onCreate,
   templates,
   onUseTemplate,
+  onVoiceMissing,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (draft: { title: string; body: string; template?: TemplateKey }) => void
   templates: SavedTemplate[]
   onUseTemplate: (id: string) => void
+  onVoiceMissing?: () => void
 }) {
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -53,23 +46,17 @@ export default function CreateSheet({
   }
 
   const listen = () => {
-    const speech = window as Window & {
-      SpeechRecognition?: new () => SpeechRecognition
-      webkitSpeechRecognition?: new () => SpeechRecognition
+    if (listening) return
+    if (!speechAvailable()) {
+      onVoiceMissing?.()
+      return
     }
-    const Ctor = speech.SpeechRecognition || speech.webkitSpeechRecognition
-    if (!Ctor) return
-    const rec = new Ctor()
-    rec.lang = 'en-US'
-    rec.interimResults = false
-    rec.continuous = false
-    rec.onresult = (event) => {
-      const spoken = event.results[0]?.[0]?.transcript
-      if (spoken) setBody((current) => (current ? `${current} ${spoken}` : spoken))
-    }
-    rec.onend = () => setListening(false)
     setListening(true)
-    rec.start()
+    startDictation({
+      onText: (spoken) => setBody((current) => appendSpoken(current, spoken)),
+      onEnd: () => setListening(false),
+      onError: onVoiceMissing,
+    })
   }
 
   return (

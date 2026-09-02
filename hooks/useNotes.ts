@@ -1,18 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyTemplate,
+  attachmentMeta,
+  blobMarkdownSrc,
+  compressImageToBlob,
   createNotebook,
   templateFromSaved,
   dailyNoteTitle,
+  duplicateNoteBlobs,
   enqueueMutation,
   findDailyNote,
+  hydrateNotesForExport,
+  accountStorageStats,
+  ingestImportedAttachments,
+  importNotesJson,
+  isolateNotes,
+  isImageMime,
   loadAccount,
   moveNote,
   newId,
   normalizeNote,
   persistAccount,
+  putNoteBlob,
+  deleteNoteBlob,
   randomNoteColor,
+  pendingMutations,
   rememberSearch,
+  reminderBody,
+  reminderFields,
+  reminderFireDate,
   restoreFromTrash,
   trashNote,
   type FilterKey,
@@ -25,10 +41,22 @@ import {
 import { cancelNoteReminder, scheduleNoteReminder } from '@/lib/native/notifications'
 import { useDebouncedValue } from './useDebouncedValue'
 
-const reminderDate = (dueAt: string | null) => {
-  if (!dueAt) return null
-  const at = new Date(`${dueAt}T09:00:00`)
-  return Number.isNaN(at.getTime()) ? null : at
+const queueReminder = (note: Note | undefined) => {
+  if (!note || note.trashedAt || note.archived) {
+    if (note) void cancelNoteReminder(note.id)
+    return
+  }
+  const at = reminderFireDate(note.dueAt, note.dueTime, note.alertMinutes)
+  if (at) {
+    void scheduleNoteReminder({
+      id: note.id,
+      title: note.title || 'Note reminder',
+      body: reminderBody(note.title, note.dueAt, note.dueTime, note.preview || note.body),
+      at,
+    })
+  } else {
+    void cancelNoteReminder(note.id)
+  }
 }
 
 export const useNotes = (ownerEmail: string | null) => {
@@ -45,6 +73,9 @@ export const useNotes = (ownerEmail: string | null) => {
   const [label, setLabel] = useState<string | null>(null)
   const [color, setColor] = useState<string | null>(null)
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [persistError, setPersistError] = useState<string | null>(null)
+  const [usageLabel, setUsageLabel] = useState<string | null>(null)
   const skipPersist = useRef(true)
 
   if (ownerEmail !== loadedFor) {
@@ -54,6 +85,9 @@ export const useNotes = (ownerEmail: string | null) => {
     setTemplates([])
     setRecents([])
     setReady(false)
+    setPendingCount(0)
+    setPersistError(null)
+    setUsageLabel(null)
   }
 
   const snapshot = useMemo(
@@ -62,22 +96,31 @@ export const useNotes = (ownerEmail: string | null) => {
   )
   const debounced = useDebouncedValue(snapshot, 400)
 
+  const refreshStorage = useCallback(async (email: string) => {
+    const stats = await accountStorageStats(email)
+    setPendingCount(stats.pending)
+    setUsageLabel(stats.usageLabel)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     if (!ownerEmail) return
-    void loadAccount(ownerEmail).then((bundle) => {
+    void loadAccount(ownerEmail).then(async (bundle) => {
       if (cancelled) return
-      setNotes(bundle.notes)
+      const owned = isolateNotes(bundle.notes, ownerEmail)
+      setNotes(owned)
       setNotebooks(bundle.notebooks)
       setTemplates(bundle.templates)
       setRecents(bundle.recents)
       setReady(true)
       skipPersist.current = true
+      owned.forEach(queueReminder)
+      await refreshStorage(ownerEmail)
     })
     return () => {
       cancelled = true
     }
-  }, [ownerEmail])
+  }, [ownerEmail, refreshStorage])
 
   useEffect(() => {
     if (!ready || !ownerEmail) return
@@ -86,7 +129,30 @@ export const useNotes = (ownerEmail: string | null) => {
       return
     }
     void persistAccount(ownerEmail, debounced)
-  }, [debounced, ownerEmail, ready])
+      .then(() => {
+        setPersistError(null)
+        return refreshStorage(ownerEmail)
+      })
+      .catch(() => {
+        setPersistError('Could not save notes on this device')
+      })
+  }, [debounced, ownerEmail, ready, refreshStorage])
+
+  useEffect(() => {
+    if (!ready || !ownerEmail) return
+    const flush = () => {
+      void persistAccount(ownerEmail, snapshot).catch(() => undefined)
+    }
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [ownerEmail, ready, snapshot])
 
   const patchNote = useCallback((id: number, updater: (note: Note) => Note) => {
     setNotes((current) => current.map((note) => (note.id === id ? updater(note) : note)))
@@ -94,25 +160,22 @@ export const useNotes = (ownerEmail: string | null) => {
 
   const saveNote = useCallback((next: Note) => {
     if (!ownerEmail) return next
-    const stamped = { ...next, ownerEmail, updatedAt: Date.now() }
+    const stamped = {
+      ...next,
+      ...reminderFields(next),
+      ownerEmail,
+      updatedAt: Date.now(),
+      attachments: next.attachments.map(attachmentMeta),
+    }
     setNotes((current) => {
       const exists = current.some((note) => note.id === next.id)
       return exists
         ? current.map((note) => (note.id === next.id ? stamped : note))
         : [stamped, ...current]
     })
-    const at = reminderDate(stamped.remindAt || stamped.dueAt)
-    if (at) {
-      void scheduleNoteReminder({
-        id: stamped.id,
-        title: stamped.title || 'Note reminder',
-        body: stamped.preview || stamped.body.slice(0, 80),
-        at,
-      })
-    } else {
-      void cancelNoteReminder(stamped.id)
-    }
+    queueReminder(stamped)
     void enqueueMutation(ownerEmail, 'note.saved', { id: stamped.id })
+    void pendingMutations(ownerEmail).then((items) => setPendingCount(items.length))
     return stamped
   }, [ownerEmail])
 
@@ -128,8 +191,11 @@ export const useNotes = (ownerEmail: string | null) => {
       notebookId: notebook?.id ?? 'inbox',
       body: partial.body ?? '',
       color: partial.color ?? randomNoteColor(),
-      dueAt: partial.dueAt ?? null,
-      remindAt: partial.remindAt ?? partial.dueAt ?? null,
+      ...reminderFields({
+        dueAt: partial.dueAt ?? null,
+        dueTime: partial.dueTime ?? null,
+        alertMinutes: partial.alertMinutes,
+      }),
       labels: partial.labels ?? [],
       attachments: partial.attachments ?? [],
       pinned: Boolean(partial.pinned),
@@ -157,14 +223,22 @@ export const useNotes = (ownerEmail: string | null) => {
   }, [createFromTemplate, notes])
 
   const duplicateNote = useCallback((note: Note) => {
-    return createBlank({
+    const copy = createBlank({
       ...note,
       title: note.title ? `${note.title} copy` : 'Untitled copy',
       pinned: false,
       archived: false,
       trashedAt: null,
+      attachments: [],
+      body: note.body,
     })
-  }, [createBlank])
+    if (ownerEmail) {
+      void duplicateNoteBlobs(ownerEmail, note, copy.id).then((cloned) => {
+        saveNote({ ...copy, body: cloned.body, attachments: cloned.attachments })
+      })
+    }
+    return copy
+  }, [createBlank, ownerEmail, saveNote])
 
   const moveToTrash = useCallback((id: number) => {
     setNotes((current) => current.map((note) => (note.id === id ? trashNote(note) : note)))
@@ -176,21 +250,14 @@ export const useNotes = (ownerEmail: string | null) => {
     setNotes((current) => {
       const next = current.map((note) => (note.id === id ? restoreFromTrash(note) : note))
       const restored = next.find((note) => note.id === id)
-      const at = reminderDate(restored?.remindAt || restored?.dueAt || null)
-      if (restored && at) {
-        void scheduleNoteReminder({
-          id: restored.id,
-          title: restored.title || 'Note reminder',
-          body: restored.preview || restored.body.slice(0, 80),
-          at,
-        })
-      }
+      queueReminder(restored)
       return next
     })
   }, [])
 
   const deleteForever = useCallback((id: number) => {
     setNotes((current) => current.filter((note) => note.id !== id))
+    void cancelNoteReminder(id)
     void enqueueMutation(ownerEmail ?? '', 'note.deleted', { id })
   }, [ownerEmail])
 
@@ -207,7 +274,11 @@ export const useNotes = (ownerEmail: string | null) => {
   }, [patchNote])
 
   const toggleArchive = useCallback((id: number) => {
-    patchNote(id, (note) => ({ ...note, archived: !note.archived, pinned: false, updatedAt: Date.now() }))
+    patchNote(id, (note) => {
+      const next = { ...note, archived: !note.archived, pinned: false, updatedAt: Date.now() }
+      queueReminder(next)
+      return next
+    })
   }, [patchNote])
 
   const toggleDone = useCallback((id: number) => {
@@ -243,6 +314,8 @@ export const useNotes = (ownerEmail: string | null) => {
       color: note.color,
       labels: [...note.labels],
       dueAt: note.dueAt,
+      dueTime: note.dueTime,
+      alertMinutes: note.alertMinutes,
       createdAt: Date.now(),
     }
     setTemplates((current) => [template, ...current])
@@ -260,7 +333,8 @@ export const useNotes = (ownerEmail: string | null) => {
       color: draft.color,
       labels: draft.labels,
       dueAt: draft.dueAt,
-      remindAt: draft.dueAt,
+      dueTime: draft.dueTime,
+      alertMinutes: draft.alertMinutes,
     })
   }, [createBlank])
 
@@ -268,11 +342,71 @@ export const useNotes = (ownerEmail: string | null) => {
     setTemplates((current) => current.filter((item) => item.id !== id))
   }, [])
 
+  const resyncReminders = useCallback(() => {
+    notes.forEach(queueReminder)
+  }, [notes])
+
   const rememberQuery = useCallback(async (query: string) => {
     if (!ownerEmail) return recents
     const next = await rememberSearch(ownerEmail, query, recents)
     setRecents(next)
   }, [ownerEmail, recents])
+
+  const addFilesToNote = useCallback(async (note: Note, files: File[], intoBody: boolean) => {
+    if (!ownerEmail || files.length === 0) return note
+    let body = note.body
+    const attachments = [...note.attachments]
+    for (const file of files) {
+      const blob = isImageMime(file.type) ? await compressImageToBlob(file) : file
+      const id = `att-${note.id}-${Date.now()}-${attachments.length}`
+      await putNoteBlob({
+        id,
+        ownerEmail,
+        noteId: note.id,
+        name: file.name,
+        mime: blob.type || file.type || 'application/octet-stream',
+        createdAt: Date.now(),
+        blob,
+      })
+      if (intoBody && isImageMime(blob.type || file.type)) {
+        body = `${body.trim() ? `${body.replace(/\s+$/, '')}\n\n` : ''}![${file.name}](${blobMarkdownSrc(id)})`
+      } else {
+        attachments.push({
+          id,
+          name: file.name,
+          mime: blob.type || file.type || 'application/octet-stream',
+          createdAt: Date.now(),
+        })
+      }
+    }
+    return saveNote({ ...note, body, attachments: attachments.map(attachmentMeta), preview: body.slice(0, 80) })
+  }, [ownerEmail, saveNote])
+
+  const removeAttachment = useCallback(async (note: Note, id: string) => {
+    if (ownerEmail) await deleteNoteBlob(ownerEmail, id)
+    const body = note.body.replace(new RegExp(`!\\[[^\\]]*\\]\\(notes-blob:${id}\\)\\n?`, 'g'), '')
+    return saveNote({
+      ...note,
+      body,
+      attachments: note.attachments.filter((item) => item.id !== id).map(attachmentMeta),
+    })
+  }, [ownerEmail, saveNote])
+
+  const exportBackup = useCallback(async () => {
+    if (!ownerEmail) return '[]'
+    const live = notes.filter((note) => !note.trashedAt && note.ownerEmail === ownerEmail)
+    const hydrated = await hydrateNotesForExport(ownerEmail, live)
+    return JSON.stringify(hydrated, null, 2)
+  }, [notes, ownerEmail])
+
+  const importBackup = useCallback(async (raw: string) => {
+    if (!ownerEmail) return 0
+    const merged = importNotesJson(raw, notes, ownerEmail)
+    const incoming = merged.filter((note) => !notes.some((item) => item.id === note.id))
+    const stored = await ingestImportedAttachments(ownerEmail, incoming)
+    stored.forEach((note) => saveNote(note))
+    return stored.length
+  }, [notes, ownerEmail, saveNote])
 
   return {
     ready,
@@ -313,6 +447,14 @@ export const useNotes = (ownerEmail: string | null) => {
     saveTemplate,
     deleteTemplate,
     rememberQuery,
+    addFilesToNote,
+    removeAttachment,
+    exportBackup,
+    importBackup,
+    pendingCount,
+    persistError,
+    usageLabel,
+    resyncReminders,
     dailyTitle: dailyNoteTitle(),
   }
 }

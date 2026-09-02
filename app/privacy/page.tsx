@@ -15,8 +15,9 @@ export default function PrivacyPage() {
         do not sell data, and do not require contacts, location, or advertising identifiers.
       </p>
       <p className="mt-4">
-        Optional cloud sync is not enabled. Local notifications, if you allow them, fire only for
-        reminders you set on your own notes.
+        If you allow notifications on the Android app, Notes schedules a local
+        lock-screen alert for dates and times you set on your own notes. Alerts stay
+        on the device. We do not send push notifications from a server.
       </p>
       <p className="mt-4">
         You can export or delete your notes from the You tab. Signing out does not upload your notes.

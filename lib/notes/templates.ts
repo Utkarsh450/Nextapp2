@@ -56,4 +56,6 @@ export const templateFromSaved = (item: SavedTemplate) => ({
   color: item.color,
   labels: item.labels ?? [],
   dueAt: item.dueAt ?? null,
+  dueTime: item.dueTime ?? null,
+  alertMinutes: item.alertMinutes,
 })

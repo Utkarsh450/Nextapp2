@@ -1,3 +1,4 @@
+import { reminderFields } from './reminders.ts'
 import { NOTE_COLORS, slugify, type Attachment, type LegacyNote, type Note } from './types.ts'
 
 const sanitizeLabels = (labels: unknown) =>
@@ -9,14 +10,18 @@ const sanitizeAttachments = (attachments: unknown): Attachment[] => {
   if (!Array.isArray(attachments)) return []
   return attachments
     .filter((item): item is Attachment =>
-      Boolean(item && typeof item === 'object' && typeof (item as Attachment).dataUrl === 'string')
+      Boolean(
+        item &&
+        typeof item === 'object' &&
+        (typeof (item as Attachment).id === 'string' || typeof (item as Attachment).dataUrl === 'string')
+      )
     )
     .map((item, index) => ({
       id: String(item.id || `att-${index}`),
       name: String(item.name || 'Attachment'),
-      mime: String(item.mime || 'image/jpeg'),
-      dataUrl: item.dataUrl,
+      mime: String(item.mime || 'application/octet-stream'),
       createdAt: Number(item.createdAt) || Date.now(),
+      ...(typeof item.dataUrl === 'string' ? { dataUrl: item.dataUrl } : {}),
     }))
 }
 
@@ -40,8 +45,11 @@ export const normalizeNote = (item: LegacyNote, index = 0, ownerEmail = ''): Not
     archived: Boolean(item.archived),
     trashedAt: typeof item.trashedAt === 'number' ? item.trashedAt : null,
     color: item.color || NOTE_COLORS[Math.abs((item.id ?? index) % NOTE_COLORS.length)],
-    dueAt: item.dueAt ?? null,
-    remindAt: item.remindAt ?? item.dueAt ?? null,
+    ...reminderFields({
+      dueAt: item.dueAt ?? null,
+      dueTime: item.dueTime ?? null,
+      alertMinutes: item.alertMinutes ?? (item.dueAt || item.remindAt ? 0 : -1),
+    }),
     labels: sanitizeLabels(item.labels),
     attachments: sanitizeAttachments(item.attachments),
     order: typeof item.order === 'number' ? item.order : index,

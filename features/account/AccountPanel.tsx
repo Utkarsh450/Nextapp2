@@ -16,6 +16,11 @@ export default function AccountPanel({
   onExportJson,
   onOpenTrash,
   onImportJson,
+  online,
+  pendingCount,
+  usageLabel,
+  persistError,
+  onEnableAlerts,
 }: {
   user: AccountUser
   email: string
@@ -26,6 +31,11 @@ export default function AccountPanel({
   onExportJson: () => void
   onOpenTrash: () => void
   onImportJson: (raw: string) => void
+  online: boolean
+  pendingCount: number
+  usageLabel: string | null
+  persistError: string | null
+  onEnableAlerts?: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [photoError, setPhotoError] = useState('')
@@ -70,6 +80,43 @@ export default function AccountPanel({
         </div>
         {user.bio && <p className="mt-4 text-sm leading-relaxed">{user.bio}</p>}
         <p className="mt-4 text-sm text-[var(--muted)]">{notesCount} notes on this device</p>
+      </div>
+
+      <div className="mt-4 rounded-[28px] bg-white/70 p-5 ring-1 ring-black/5 dark:bg-white/5">
+        <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-[var(--muted)]">On this device</p>
+        <p className="mt-2 text-sm leading-relaxed">
+          {online ? 'Notes save here, even without a network.' : 'You are offline. Notes still save on this phone.'}
+        </p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {pendingCount > 0
+            ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} waiting for a future cloud.`
+            : 'Change log is quiet. Cloud sync is optional later.'}
+        </p>
+        {usageLabel && (
+          <p className="mt-1 text-xs text-[var(--muted)]">{usageLabel} used on this device</p>
+        )}
+        {persistError && <p className="mt-2 text-sm text-red-700">{persistError}</p>}
+      </div>
+
+      <div className="mt-4 rounded-[28px] bg-white/70 p-5 ring-1 ring-black/5 dark:bg-white/5">
+        <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-[var(--muted)]">Calendar alerts</p>
+        <p className="mt-2 text-sm leading-relaxed">
+          Notes can ping the lock screen at the time you set — like a Google Calendar event.
+          Allow notifications and exact alarms so a reminder is not delayed.
+        </p>
+        {onEnableAlerts ? (
+          <button
+            type="button"
+            onClick={onEnableAlerts}
+            className="mt-3 min-h-12 w-full rounded-full bg-[var(--ink)] text-sm font-semibold text-[var(--paper)]"
+          >
+            Allow phone alerts
+          </button>
+        ) : (
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            The browser cannot wake the phone. Use the Android app for lock-screen alerts.
+          </p>
+        )}
       </div>
 
       {editing && (

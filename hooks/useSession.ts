@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AuthSession } from '@/lib/auth'
-import { authFetch, clearAuthToken, loadAuthOrigin, writeAuthToken } from '@/lib/auth/client'
+import { authFetch, clearAuthToken, loadAuthOrigin, readAuthToken, writeAuthToken } from '@/lib/auth/client'
+import { peekAuthToken } from '@/lib/auth/offlineSession'
 import { applyThemeClass, readTheme, writeTheme, type ThemeMode } from '@/lib/theme'
 
 export const useTheme = () => {
@@ -28,6 +29,8 @@ export const useTheme = () => {
   return { theme, toggle }
 }
 
+const localSession = () => peekAuthToken(readAuthToken())
+
 export const useSession = () => {
   const [session, setSession] = useState<AuthSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,9 +40,9 @@ export const useSession = () => {
     try {
       const response = await authFetch('/api/auth/session', { method: 'GET' }, authOrigin)
       const data = await response.json() as { session?: AuthSession | null }
-      setSession(data.session ?? null)
+      setSession(data.session ?? localSession())
     } catch {
-      setSession(null)
+      setSession(localSession())
     } finally {
       setLoading(false)
     }
@@ -54,9 +57,9 @@ export const useSession = () => {
         try {
           const response = await authFetch('/api/auth/session', { method: 'GET' }, nextOrigin)
           const data = await response.json() as { session?: AuthSession | null }
-          if (!cancelled) setSession(data.session ?? null)
+          if (!cancelled) setSession(data.session ?? localSession())
         } catch {
-          if (!cancelled) setSession(null)
+          if (!cancelled) setSession(localSession())
         } finally {
           if (!cancelled) setLoading(false)
         }

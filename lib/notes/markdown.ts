@@ -78,7 +78,11 @@ export const wordCount = (text: string) => {
 
 export const cardBodyPreview = (body: string, preview = '') => {
   const text = (body || preview || '').trim()
-  return text.replace(/^#+\s+/gm, '').trim()
+  return text
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/^#+\s+/gm, '')
+    .trim()
 }
 
 export const highlightSegments = (text: string, query: string) => {

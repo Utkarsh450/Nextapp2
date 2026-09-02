@@ -27,12 +27,18 @@ export const exportNotesMarkdown = (notes: Note[]) =>
       const meta = [
         `tag: ${note.tag || 'Note'}`,
         `notebook: ${note.notebook || 'Inbox'}`,
-        note.dueAt ? `due: ${note.dueAt}` : '',
+        note.dueAt ? `due: ${note.dueAt}${note.dueTime ? ` ${note.dueTime}` : ''}` : '',
         note.labels.length ? `labels: ${note.labels.join(', ')}` : '',
       ]
         .filter(Boolean)
         .join(' · ')
-      return [heading, meta, note.preview, note.body].filter(Boolean).join('\n\n')
+      const body = note.body.replace(/!\[([^\]]*)\]\(notes-blob:[^)]+\)/g, '![$1](attachment)')
+      const files = note.attachments.length
+        ? note.attachments.map((item) => `- ${item.name}`).join('\n')
+        : ''
+      return [heading, meta, note.preview, body, files ? `## Attachments\n\n${files}` : '']
+        .filter(Boolean)
+        .join('\n\n')
     })
     .join('\n\n---\n\n')
 

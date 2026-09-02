@@ -1,72 +1,84 @@
 "use client"
 
 import {
+  Download,
   Eye,
   ImagePlus,
+  Link2,
   ListChecks,
   Mic,
   Paperclip,
   Pencil,
   X,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   NOTE_COLORS,
   LABEL_PRESETS,
-  compressImageFile,
+  backlinksTo,
+  collectBlobIds,
+  findNoteByTitle,
   insertChecklist,
-  insertImageMarkdown,
+  insertWikiLink,
+  isImageMime,
   labelTint,
+  linkableNotes,
   toggleTaskLine,
   wordCount,
   type Note,
   type Notebook,
 } from '@/lib/notes'
+import { appendSpoken, speechAvailable, startDictation } from '@/lib/native/speech'
+import { useAttachmentUrls } from '@/hooks/useAttachmentUrls'
+import { calendarAlertsAvailable } from '@/lib/native/notifications'
 import MarkdownPreview from './MarkdownPreview'
-
-const SpeechCtor = () => {
-  if (typeof window === 'undefined') return null
-  const speech = window as Window & {
-    SpeechRecognition?: new () => SpeechRecognition
-    webkitSpeechRecognition?: new () => SpeechRecognition
-  }
-  return speech.SpeechRecognition || speech.webkitSpeechRecognition || null
-}
-
-type SpeechRecognition = {
-  lang: string
-  interimResults: boolean
-  continuous: boolean
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null
-  onend: (() => void) | null
-  start: () => void
-  stop: () => void
-}
+import ReminderFields from './ReminderFields'
 
 export default function NoteEditor({
   note,
+  notes,
   notebooks,
   onChange,
   onClose,
   onSaveTemplate,
+  onAddFiles,
+  onRemoveAttachment,
+  onOpenNote,
+  onCreateLinked,
+  onExport,
+  onVoiceMissing,
 }: {
   note: Note
+  notes: Note[]
   notebooks: Notebook[]
   onChange: (note: Note) => void
   onClose: () => void
   onSaveTemplate: (note: Note) => void
+  onAddFiles: (files: File[], intoBody: boolean) => void
+  onRemoveAttachment: (id: string) => void
+  onOpenNote: (id: number) => void
+  onCreateLinked: (title: string) => void
+  onExport: () => void
+  onVoiceMissing: () => void
 }) {
   const [preview, setPreview] = useState(false)
   const [listening, setListening] = useState(false)
   const [labelDraft, setLabelDraft] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
   const [noteId, setNoteId] = useState(note.id)
   const imageRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const blobIds = useMemo(() => collectBlobIds(note), [note])
+  const blobUrls = useAttachmentUrls(note.ownerEmail, blobIds)
   const count = wordCount(`${note.title} ${note.body}`)
+  const incoming = useMemo(() => backlinksTo(note, notes), [note, notes])
+  const others = useMemo(() => linkableNotes(notes, note.id), [note.id, notes])
 
   if (note.id !== noteId) {
     setNoteId(note.id)
     setLabelDraft('')
+    setLinkOpen(false)
+    setPreview(false)
   }
 
   const patch = (partial: Partial<Note>) => {
@@ -74,19 +86,23 @@ export default function NoteEditor({
   }
 
   const listen = () => {
-    const Ctor = SpeechCtor()
-    if (!Ctor) return
-    const rec = new Ctor()
-    rec.lang = 'en-US'
-    rec.interimResults = false
-    rec.continuous = false
-    rec.onresult = (event) => {
-      const spoken = event.results[0]?.[0]?.transcript
-      if (spoken) patch({ body: note.body ? `${note.body} ${spoken}` : spoken })
+    if (listening) return
+    if (!speechAvailable()) {
+      onVoiceMissing()
+      return
     }
-    rec.onend = () => setListening(false)
     setListening(true)
-    rec.start()
+    startDictation({
+      onText: (spoken) => patch({ body: appendSpoken(note.body, spoken) }),
+      onEnd: () => setListening(false),
+      onError: onVoiceMissing,
+    })
+  }
+
+  const openLink = (title: string) => {
+    const match = findNoteByTitle(notes, title)
+    if (match) onOpenNote(match.id)
+    else onCreateLinked(title)
   }
 
   return (
@@ -127,15 +143,13 @@ export default function NoteEditor({
               <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
-          <div className="sm:col-span-2">
-            <p className="mb-1 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Due date · reminder</p>
-            <input
-              type="date"
-              value={note.dueAt ?? ''}
-              onChange={(event) => patch({ dueAt: event.target.value || null, remindAt: event.target.value || note.remindAt })}
-              className="min-h-11 w-full rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
-            />
-          </div>
+          <ReminderFields
+            dueAt={note.dueAt}
+            dueTime={note.dueTime}
+            alertMinutes={note.alertMinutes}
+            native={calendarAlertsAvailable()}
+            onChange={(next) => patch(next)}
+          />
         </div>
         <div className="space-y-2">
           <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Labels</p>
@@ -210,6 +224,9 @@ export default function NoteEditor({
           <button type="button" onClick={listen} className="chip">
             <Mic size={14} /> {listening ? 'Listening…' : 'Voice'}
           </button>
+          <button type="button" onClick={() => setLinkOpen((value) => !value)} className="chip">
+            <Link2 size={14} /> Link note
+          </button>
           <button type="button" onClick={() => setPreview((value) => !value)} className="chip">
             {preview ? <Pencil size={14} /> : <Eye size={14} />}
             {preview ? 'Edit' : 'Preview'}
@@ -217,27 +234,85 @@ export default function NoteEditor({
           <button type="button" onClick={() => onSaveTemplate(note)} className="chip">
             Save as template
           </button>
+          <button type="button" onClick={onExport} className="chip">
+            <Download size={14} /> Export
+          </button>
         </div>
+
+        {linkOpen && (
+          <div className="rounded-2xl bg-white/60 p-3 dark:bg-white/5">
+            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Insert [[link]]</p>
+            <div className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto">
+              {others.length === 0 && (
+                <p className="text-sm text-[var(--muted)]">Give another note a title, then link it here.</p>
+              )}
+              {others.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="rounded-xl px-2 py-2 text-left text-sm"
+                  onClick={() => {
+                    patch({ body: insertWikiLink(note.body, item.title) })
+                    setLinkOpen(false)
+                  }}
+                >
+                  {item.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {preview ? (
           <MarkdownPreview
             body={note.body}
+            blobUrls={blobUrls}
             onToggleTask={(line) => patch({ body: toggleTaskLine(note.body, line) })}
+            onOpenLink={openLink}
           />
         ) : (
           <textarea
             value={note.body}
             onChange={(event) => patch({ body: event.target.value })}
-            placeholder="Write here. Checklists use - [ ] like this."
+            placeholder="Write here. Checklists use - [ ]. Link notes with [[Title]]."
             className="min-h-64 w-full resize-y rounded-2xl bg-white/60 p-4 text-base leading-relaxed outline-none dark:bg-white/5"
           />
         )}
 
         {note.attachments.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
-            {note.attachments.map((file) => (
-              <img key={file.id} src={file.dataUrl} alt={file.name} className="h-24 w-full rounded-2xl object-cover" />
-            ))}
+            {note.attachments.map((file) => {
+              const src = blobUrls[file.id] || file.dataUrl
+              return (
+                <button
+                  key={file.id}
+                  type="button"
+                  className="relative overflow-hidden rounded-2xl bg-white/60 text-left dark:bg-white/5"
+                  onClick={() => onRemoveAttachment(file.id)}
+                >
+                  {src && isImageMime(file.mime) ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- local blob previews
+                    <img src={src} alt={file.name} className="h-24 w-full object-cover" />
+                  ) : (
+                    <span className="flex h-24 items-center px-2 text-xs">{file.name}</span>
+                  )}
+                  <span className="absolute right-1 top-1 rounded-full bg-white/80 px-1.5 text-[0.65rem]">×</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {(incoming.length > 0) && (
+          <div>
+            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Linked from</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {incoming.map((item) => (
+                <button key={item.id} type="button" className="chip" onClick={() => onOpenNote(item.id)}>
+                  {item.title || 'Untitled'}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -246,29 +321,21 @@ export default function NoteEditor({
           type="file"
           accept="image/*"
           className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0]
-            if (!file) return
-            const src = await compressImageFile(file)
-            patch({ body: insertImageMarkdown(note.body, src, file.name) })
+          onChange={(event) => {
+            const files = [...(event.target.files ?? [])]
+            if (files.length) onAddFiles(files, true)
             event.target.value = ''
           }}
         />
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,.txt,.md,application/pdf,text/plain"
+          multiple
           className="hidden"
-          onChange={async (event) => {
-            const file = event.target.files?.[0]
-            if (!file) return
-            const dataUrl = await compressImageFile(file)
-            patch({
-              attachments: [
-                ...note.attachments,
-                { id: `att-${Date.now()}`, name: file.name, mime: file.type, dataUrl, createdAt: Date.now() },
-              ],
-            })
+          onChange={(event) => {
+            const files = [...(event.target.files ?? [])]
+            if (files.length) onAddFiles(files, false)
             event.target.value = ''
           }}
         />
