@@ -66,8 +66,8 @@ reading the code, not by comments flagging it.
 | Archive / unarchive | ✅ | Via context menu / NoteDetail. |
 | Move to trash / restore / delete forever | ✅ | 30-day trash auto-purge (`TRASH_TTL_MS`). |
 | Duplicate note | ✅ | Also duplicates any attached blobs with new IDs. |
-| **Mark note "done" (`confirmed` field + `toggleDone`)** | ⚪ **Orphaned** | Data model field exists, `useNotes().toggleDone` exists and is unit-tested, drives the `'done'`/`'open'` filter — but **no UI component ever calls `toggleDone`**. `components/ui/PaytmTick.tsx` (a fully animated checkmark toggle) looks like the intended UI for this and is itself unused/unimported anywhere. **Decision needed:** wire this up as a real feature in Flutter (recommended — it's clearly intended, just never connected), or drop it. |
-| **Drag-to-reorder notes** | 🟡 **Partial** | `lib/notes/filters.ts::moveNote()` + `hooks/useNotes.ts::reorder` are implemented and unit-tested (`lib/notes/notes.test.ts:162`), and `Note.order` exists — but **no drag gesture is wired in any component** (no `draggable`, no pointer-drag handler). Reordering is not reachable by a user today. |
+| **Mark note "done" (`confirmed` field + `toggleDone`)** | ✅ **Decided: port as a real feature** | Data model field exists, `useNotes().toggleDone` exists and is unit-tested, drives the `'done'`/`'open'` filter — but was never wired to a UI in the Next.js app (`components/ui/PaytmTick.tsx`, a fully animated checkmark toggle, was built for this purpose and never imported anywhere). **Decision (2026-09-05): the Flutter app will wire this up as a genuine, tappable "mark done" gesture** — e.g. a checkmark on `NoteCard`/`NoteDetail` calling the equivalent of `toggleDone`, styled after `PaytmTick.tsx`'s check-draw/ripple animation. This is a Flutter-side addition beyond the Next.js app's actual shipped behavior, not a straight port. |
+| **Drag-to-reorder notes** | ✅ **Decided: port as a real feature** | `lib/notes/filters.ts::moveNote()` + `hooks/useNotes.ts::reorder` are implemented and unit-tested (`lib/notes/notes.test.ts:162`), and `Note.order` exists — but no drag gesture was ever wired in the Next.js UI. **Decision (2026-09-05): the Flutter app will implement real drag-to-reorder** (e.g. `ReorderableListView`/`ReorderableGridView` on the notes grid, writing back through `order` the same way `moveNote()` does) so the existing, tested reorder logic actually becomes reachable. Also a Flutter-side addition beyond the Next.js app's shipped behavior. |
 | **Swipe-to-delete/archive** | ❌ **Missing** | Not implemented anywhere — no swipe gesture handlers exist. Trash/Archive are reachable only via long-press context menu or explicit buttons. |
 
 ## 3. Every other feature, including small/easy-to-miss ones
@@ -108,8 +108,8 @@ reading the code, not by comments flagging it.
 | Item | Why it's dead | Recommendation |
 |---|---|---|
 | `features/shell/Fab.tsx` | Standalone FAB component, never imported anywhere — superseded by the dock-integrated FAB in `AppTabs.tsx`. | Don't port; use the dock+notch+FAB pattern from `AppTabs.tsx` as the source of truth. |
-| `components/ui/PaytmTick.tsx` | Fully built animated checkmark (ripple, pop, SVG check-draw, haptic) — never imported anywhere. | Its natural purpose (toggle `Note.confirmed` / done state) is real and tested at the data layer (`toggleDone`) but was never wired to a UI. **Ask the user:** wire it up as a genuine "mark done" gesture in Flutter (recommended, low effort, clearly intended), or drop `confirmed`/`toggleDone` entirely. |
-| Drag-to-reorder (`moveNote`/`reorder`) | Data layer + tests exist; no UI gesture. | Same — ask whether Flutter should implement real drag-reorder (e.g. via `ReorderableListView`) or drop the `order` field/API. |
+| `components/ui/PaytmTick.tsx` | Fully built animated checkmark (ripple, pop, SVG check-draw, haptic) — never imported anywhere. | **Decided:** port its animation style to a real, wired-up "mark done" gesture in Flutter (toggles `confirmed` via the `toggleDone` equivalent). |
+| Drag-to-reorder (`moveNote`/`reorder`) | Data layer + tests exist; no UI gesture. | **Decided:** implement real drag-reorder in Flutter (e.g. via `ReorderableListView`/`ReorderableGridView`), writing back through `order` the same way `moveNote()` does. |
 | Sync/mutation queue (`queue.ts`) | Local bookkeeping with no consumer. | Recommend dropping in Flutter unless a server-sync feature is actually planned; don't reimplement a queue that goes nowhere. |
 
 ## 5. Dependencies observed (relevant to Flutter package choices later)
@@ -133,7 +133,13 @@ separately). Everything else (notes, notebooks, templates, habits, backups,
 reminders) is IndexedDB + local device notifications, no backend. That
 materially simplifies the Flutter architecture: Drift/Hive replaces Dexie
 1:1, and the only network client needed is the one hitting the Next.js auth
-API. Three features are genuinely half-built in the source app (done/marked
-toggle, drag-reorder, sync queue) — each needs an explicit decision (port for
-real, or drop) before Phase 3, since they're **not** "already working" despite
-having code and tests behind them.
+API. Three features were genuinely half-built in the source app (done/marked
+toggle, drag-reorder, sync queue) — despite having code and tests behind
+them, they were **not** "already working" in the shipped Next.js app.
+**Decided (2026-09-05):** "mark done" and drag-to-reorder will be built as
+real, wired-up features in Flutter — genuine additions beyond what the
+Next.js app actually did, using the existing tested data-layer logic
+(`toggleDone`, `moveNote`/`reorder`, `Note.order`) as the implementation
+basis. The sync/mutation queue (`queue.ts`) remains an open decision — still
+recommend dropping it in Flutter unless a real sync backend is planned,
+since nothing consumes it today.
