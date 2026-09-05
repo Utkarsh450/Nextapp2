@@ -2,24 +2,28 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import EmptyState from '@/components/ui/EmptyState'
+import PaperStage from '@/components/ui/PaperStage'
 import Toast from '@/components/ui/Toast'
 import AccountPanel from '@/features/account/AccountPanel'
 import AuthScreen from '@/features/auth/AuthScreen'
+import OnboardingScreen from '@/features/auth/OnboardingScreen'
 import AppHeader from '@/features/shell/AppHeader'
-import AppTabs from '@/features/shell/AppTabs'
-import Fab from '@/features/shell/Fab'
+import AppTabs, { type AddAction } from '@/features/shell/AppTabs'
 import { useNotes } from '@/hooks/useNotes'
+import { useHabits } from '@/hooks/useHabits'
 import { useOnline } from '@/hooks/useOnline'
-import { useSession, useTheme } from '@/hooks/useSession'
+import { useSession, useTheme, useSkin, useLayout } from '@/hooks/useSession'
 import {
   exportNotesMarkdown,
   insertWikiLink,
   labelTint,
+  noteDashboard,
   uniqueColors,
   uniqueLabels,
   upcomingReminders,
   visibleNotes,
   todayISO,
+  noteAgenda,
   type AppTab,
   type FilterKey,
   type Note,
@@ -29,6 +33,7 @@ import {
   enableCalendarAlerts,
   watchReminderOpens,
 } from '@/lib/native/notifications'
+import { hasFinishedOnboarding, markOnboardingDone } from '@/lib/onboarding'
 import {
   profileFromEmail,
   profileToAccountUser,
@@ -37,13 +42,17 @@ import {
   type UserProfile,
 } from '@/lib/profile'
 import CreateSheet from './CreateSheet'
+import NoteDetail from './NoteDetail'
 import NoteEditor from './NoteEditor'
 import NotebooksView from './NotebooksView'
 import NotesGrid from './NotesGrid'
+import PlanView from './PlanView'
 import SearchOverlay from './SearchOverlay'
+import TodayBoard from './TodayBoard'
 
 const FILTERS: Array<{ id: FilterKey; label: string }> = [
   { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
   { id: 'due', label: 'Due' },
   { id: 'done', label: 'Done' },
   { id: 'archived', label: 'Archive' },
@@ -63,34 +72,49 @@ const download = (filename: string, text: string, type: string) => {
 export default function NotesApp() {
   const { session, loading, sendOtp, verifyOtp, logout } = useSession()
   const { theme, toggle } = useTheme()
+  const { skin, setPaperSkin } = useSkin()
+  const { layout, setBoardLayout } = useLayout()
   const online = useOnline()
   const email = session?.email ?? ''
   const board = useNotes(session?.email ?? null)
+  const habits = useHabits(session?.email ?? null)
   const [tab, setTab] = useState<AppTab>('notes')
   const [searchOpen, setSearchOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [openId, setOpenId] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
   const [toast, setToast] = useState<{ message: string; actionLabel?: string; onAction?: () => void } | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [templateDraft, setTemplateDraft] = useState('')
   const [savingTemplate, setSavingTemplate] = useState<Note | null>(null)
   const [emptyingTrash, setEmptyingTrash] = useState(false)
+  const [onboarded, setOnboarded] = useState<boolean | null>(null)
   const pendingOpen = useRef<number | null>(null)
 
   useEffect(() => {
     return watchReminderOpens((id) => {
       pendingOpen.current = id
       setTab('notes')
-      setEditingId(id)
+      setOpenId(id)
+      setIsEditing(false)
     })
   }, [])
+
+  useEffect(() => {
+    if (!session?.email) {
+      setOnboarded(null)
+      return
+    }
+    setOnboarded(hasFinishedOnboarding(session.email))
+  }, [session?.email])
 
   useEffect(() => {
     if (!board.ready || !email || pendingOpen.current == null) return
     const id = pendingOpen.current
     if (board.notes.some((note) => note.id === id)) {
       pendingOpen.current = null
-      setEditingId(id)
+      setOpenId(id)
+      setIsEditing(false)
       setTab('notes')
     }
   }, [board.notes, board.ready, email])
@@ -153,22 +177,88 @@ export default function NotesApp() {
     return counts
   }, [board.notes])
 
+  const dash = useMemo(
+    () => noteDashboard(board.notes.filter((note) => note.ownerEmail === email), board.notebooks, today),
+    [board.notebooks, board.notes, email, today]
+  )
+  const agenda = useMemo(
+    () => noteAgenda(board.notes.filter((note) => note.ownerEmail === email), today),
+    [board.notes, email, today]
+  )
+  const showToday =
+    tab === 'notes' &&
+    board.filterKey === 'all' &&
+    !board.notebookId &&
+    !board.search.trim() &&
+    !board.label &&
+    !board.color
   const labels = useMemo(() => uniqueLabels(board.notes.filter((note) => note.ownerEmail === email)), [board.notes, email])
   const colors = useMemo(() => uniqueColors(board.notes.filter((note) => note.ownerEmail === email)), [board.notes, email])
-  const editing = board.notes.find((note) => note.id === editingId) ?? null
+  const opened = board.notes.find((note) => note.id === openId) ?? null
   const liveNotes = board.notes.filter((note) => !note.trashedAt && !note.archived && note.ownerEmail === email)
   const ping = (message: string, actionLabel?: string, onAction?: () => void) =>
     setToast({ message, actionLabel, onAction })
 
-  if (loading) {
-    return <div className="grid min-h-dvh place-items-center text-[var(--muted)]">Opening notes…</div>
+  if (loading || (session && onboarded === null)) {
+    return (
+      <PaperStage>
+        <div className="grid min-h-dvh place-items-center text-[var(--muted)]">Opening notes…</div>
+      </PaperStage>
+    )
   }
 
   if (!session) {
     return <AuthScreen sendOtp={sendOtp} verifyOtp={verifyOtp} />
   }
 
-  const openNote = (id: number) => setEditingId(id)
+  if (!onboarded) {
+    return (
+      <OnboardingScreen
+        email={email}
+        skin={skin}
+        onSkin={setPaperSkin}
+        onFinish={(next) => {
+          saveProfileForEmail(email, next)
+          setProfile(next)
+          markOnboardingDone(email)
+          setOnboarded(true)
+        }}
+      />
+    )
+  }
+
+  const openNote = (id: number) => {
+    setOpenId(id)
+    setIsEditing(false)
+  }
+  const editNote = (id: number) => {
+    setOpenId(id)
+    setIsEditing(true)
+  }
+  const closeOpened = () => {
+    setOpenId(null)
+    setIsEditing(false)
+  }
+  const handleAdd = (action: AddAction) => {
+    if (action === 'capture') {
+      setCreateOpen(true)
+      return
+    }
+    if (action.startsWith('saved:')) {
+      const template = board.templates.find((item) => item.id === action.slice(6))
+      if (!template) return
+      setTab('notes')
+      editNote(board.createFromSavedTemplate(template).id)
+      return
+    }
+    setTab('notes')
+    if (action === 'note') editNote(board.createBlank().id)
+    else if (action === 'list') editNote(board.createBlank({ body: '- [ ] \n- [ ] \n- [ ] ' }).id)
+    else if (action === 'daily') editNote(board.openDailyNote().id)
+    else if (action === 'idea') editNote(board.createFromTemplate('idea').id)
+    else if (action === 'meeting') editNote(board.createFromTemplate('meeting').id)
+    else if (action === 'reminder') editNote(board.createBlank({ dueAt: todayISO() }).id)
+  }
   const duplicate = (id: number) => {
     const note = board.notes.find((item) => item.id === id)
     if (note) board.duplicateNote(note)
@@ -183,15 +273,12 @@ export default function NotesApp() {
   return (
     <div className="notes-board min-h-dvh">
       <AppHeader
-        title={tab === 'you' ? 'You' : tab === 'notebooks' ? 'Notebooks' : board.notebookId ? (board.notebooks.find((item) => item.id === board.notebookId)?.name ?? 'Notes') : 'Notes'}
-        dark={theme === 'dark'}
+        title={board.notebookId ? (board.notebooks.find((item) => item.id === board.notebookId)?.name ?? 'Notes') : 'Notes'}
+        quiet={tab !== 'notes' || showToday}
+        layout={layout}
+        showLayout={tab === 'notes'}
         onSearch={() => setSearchOpen(true)}
-        onDaily={() => {
-          const note = board.openDailyNote()
-          setTab('notes')
-          setEditingId(note.id)
-        }}
-        onToggleTheme={toggle}
+        onLayout={setBoardLayout}
       />
 
       {!online && (
@@ -200,10 +287,38 @@ export default function NotesApp() {
         </p>
       )}
 
-      {tab === 'notes' && reminders.length > 0 && board.filterKey !== 'trash' && (
+      {showToday && (
+        <TodayBoard
+          name={account.name}
+          dash={dash}
+          onOpen={openNote}
+          onDue={() => {
+            board.setFilterKey('due')
+            board.setLabel(null)
+            board.setColor(null)
+          }}
+          onNotebook={(id) => {
+            board.setNotebookId(id)
+            board.setFilterKey('all')
+            setTab('notes')
+          }}
+          onOpenLists={() => {
+            board.setFilterKey('open')
+            board.setLabel(null)
+            board.setColor(null)
+          }}
+          onDone={() => {
+            board.setFilterKey('done')
+            board.setLabel(null)
+            board.setColor(null)
+          }}
+        />
+      )}
+
+      {tab === 'notes' && !showToday && reminders.length > 0 && board.filterKey !== 'trash' && (
         <button
           type="button"
-          className="mx-4 mb-3 w-[calc(100%-2rem)] rounded-2xl bg-[#F9D368]/80 px-4 py-3 text-left text-sm text-zinc-800"
+          className="mx-4 mb-3 w-[calc(100%-2rem)] rounded-[22px] bg-[#F9D368]/85 px-4 py-3.5 text-left text-sm text-zinc-800 shadow-[var(--shadow-card)]"
           onClick={() => {
             board.setFilterKey('due')
             board.setLabel(null)
@@ -211,7 +326,7 @@ export default function NotesApp() {
             setTab('notes')
           }}
         >
-          <p className="font-medium">
+          <p className="note-title text-[1.05rem] font-semibold leading-tight">
             {reminders.length} reminder{reminders.length === 1 ? '' : 's'} due today
           </p>
           <p className="mt-1 line-clamp-2 text-zinc-700/80">
@@ -246,7 +361,7 @@ export default function NotesApp() {
               className="chip whitespace-nowrap"
               onClick={() => {
                 const note = board.openDailyNote()
-                setEditingId(note.id)
+                editNote(note.id)
               }}
             >
               Today&apos;s log
@@ -304,7 +419,7 @@ export default function NotesApp() {
               name={item.name}
               onUse={() => {
                 const note = board.createFromSavedTemplate(item)
-                setEditingId(note.id)
+                editNote(note.id)
               }}
               onRemove={() => {
                 board.deleteTemplate(item.id)
@@ -313,6 +428,10 @@ export default function NotesApp() {
             />
           ))}
         </div>
+      )}
+
+      {tab === 'notes' && showToday && shown.length > 0 && (
+        <p className="mb-3 px-4 text-[0.72rem] font-medium uppercase tracking-[0.16em] text-[var(--muted)]">Your notes</p>
       )}
 
       {tab === 'notes' && shown.length === 0 && (
@@ -337,7 +456,7 @@ export default function NotesApp() {
           notes={shown}
           query={board.search}
           onOpen={openNote}
-          onToggleDone={board.toggleDone}
+          onToggleTask={board.toggleTask}
           onPin={board.togglePin}
           onArchive={board.toggleArchive}
           onDuplicate={duplicate}
@@ -378,6 +497,19 @@ export default function NotesApp() {
         </div>
       )}
 
+      {tab === 'plan' && (
+        <PlanView
+          agenda={agenda}
+          today={today}
+          habits={habits.habits}
+          checks={habits.checks}
+          onOpen={openNote}
+          onAddHabit={habits.addHabit}
+          onRemoveHabit={habits.removeHabit}
+          onToggleHabit={habits.toggleCheck}
+        />
+      )}
+
       {tab === 'notebooks' && (
         <NotebooksView
           notebooks={board.notebooks}
@@ -398,6 +530,9 @@ export default function NotesApp() {
           user={account}
           email={email}
           notesCount={liveNotes.length}
+          notebooksCount={board.notebooks.length}
+          reminderCount={agenda.waiting}
+          trashCount={board.notes.filter((note) => note.trashedAt && note.ownerEmail === email).length}
           onSave={saveProfile}
           onLogout={() => void logout()}
           onExportMarkdown={() => download('notes.md', exportNotesMarkdown(liveNotes), 'text/markdown')}
@@ -408,6 +543,13 @@ export default function NotesApp() {
             board.setFilterKey('trash')
             setTab('notes')
           }}
+          onOpenNotes={() => {
+            board.setFilterKey('all')
+            board.setNotebookId(null)
+            setTab('notes')
+          }}
+          onOpenBooks={() => setTab('notebooks')}
+          onOpenPlan={() => setTab('plan')}
           onImportJson={(raw) => {
             void board.importBackup(raw).then((count) => {
               ping(count ? `Imported ${count} notes` : 'Nothing new to import')
@@ -417,6 +559,10 @@ export default function NotesApp() {
           pendingCount={board.pendingCount}
           usageLabel={board.usageLabel}
           persistError={board.persistError}
+          skin={skin}
+          onSkin={setPaperSkin}
+          dark={theme === 'dark'}
+          onToggleTheme={toggle}
           onEnableAlerts={
             calendarAlertsAvailable()
               ? () => {
@@ -438,7 +584,9 @@ export default function NotesApp() {
 
       <AppTabs
         tab={tab}
-        hidden={Boolean(editing) || searchOpen}
+        hidden={Boolean(opened) || searchOpen}
+        planAlert={agenda.overdue.length + agenda.dueToday.length > 0}
+        templates={board.templates}
         onChange={(next) => {
           setTab(next)
           if (next !== 'notes') {
@@ -446,15 +594,8 @@ export default function NotesApp() {
             setEmptyingTrash(false)
           }
         }}
-      />
-      <Fab
-        hidden={Boolean(editing) || tab === 'you' || searchOpen}
-        onClick={() => {
-          const note = board.createBlank()
-          setTab('notes')
-          setEditingId(note.id)
-        }}
-        onLongPress={() => setCreateOpen(true)}
+        onAdd={handleAdd}
+        onWriteHold={() => setCreateOpen(true)}
       />
       <Toast message={toast?.message ?? null} actionLabel={toast?.actionLabel} onAction={toast?.onAction} />
 
@@ -495,7 +636,7 @@ export default function NotesApp() {
         onOpen={(id) => {
           setSearchOpen(false)
           setTab('notes')
-          setEditingId(id)
+          openNote(id)
         }}
       />
 
@@ -508,42 +649,73 @@ export default function NotesApp() {
           const template = board.templates.find((item) => item.id === id)
           if (!template) return
           const note = board.createFromSavedTemplate(template)
-          setEditingId(note.id)
+          editNote(note.id)
           setTab('notes')
         }}
         onCreate={({ title, body, template }) => {
           const note = template ? board.createFromTemplate(template) : board.createBlank({ title, body })
           if (!template && (title || body)) board.saveNote({ ...note, title, body, preview: body.slice(0, 80) })
-          setEditingId(note.id)
+          editNote(note.id)
           setTab('notes')
         }}
       />
 
-      {editing && (
+      {opened && !isEditing && (
+        <div className="fixed inset-0 z-50">
+          <NoteDetail
+            note={opened}
+            notes={board.notes}
+            onClose={closeOpened}
+            onEdit={() => setIsEditing(true)}
+            onChange={(note) => board.saveNote(note)}
+            onOpenNote={openNote}
+            onRestore={() => {
+              board.restoreTrashed(opened.id)
+              ping('Restored')
+            }}
+            onDelete={() => {
+              const id = opened.id
+              board.moveToTrash(id)
+              closeOpened()
+              ping('Moved to trash', 'Undo', () => {
+                board.restoreTrashed(id)
+                ping('Restored')
+              })
+            }}
+            onDeleteForever={() => {
+              board.deleteForever(opened.id)
+              closeOpened()
+              ping('Deleted')
+            }}
+          />
+        </div>
+      )}
+
+      {opened && isEditing && (
         <div className="fixed inset-0 z-50 bg-[var(--paper)]">
           <NoteEditor
-            note={editing}
+            note={opened}
             notes={board.notes}
             notebooks={board.notebooks}
             onChange={(note: Note) => board.saveNote(note)}
-            onClose={() => setEditingId(null)}
+            onClose={() => setIsEditing(false)}
             onSaveTemplate={(note) => {
               setSavingTemplate(note)
               setTemplateDraft(note.title || 'Template')
             }}
             onAddFiles={(files, intoBody) => {
-              void board.addFilesToNote(editing, files, intoBody)
+              void board.addFilesToNote(opened, files, intoBody)
             }}
             onRemoveAttachment={(id) => {
-              void board.removeAttachment(editing, id)
+              void board.removeAttachment(opened, id)
             }}
-            onOpenNote={(id) => setEditingId(id)}
+            onOpenNote={(id) => openNote(id)}
             onCreateLinked={(title) => {
-              board.saveNote({ ...editing, body: insertWikiLink(editing.body, title) })
+              board.saveNote({ ...opened, body: insertWikiLink(opened.body, title) })
               const created = board.createBlank({ title })
-              setEditingId(created.id)
+              editNote(created.id)
             }}
-            onExport={() => download(`${editing.title || 'note'}.md`, exportNotesMarkdown([editing]), 'text/markdown')}
+            onExport={() => download(`${opened.title || 'note'}.md`, exportNotesMarkdown([opened]), 'text/markdown')}
             onVoiceMissing={() => ping('Voice is not available in this browser')}
           />
         </div>

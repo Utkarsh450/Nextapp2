@@ -1,11 +1,11 @@
 export const NOTE_COLORS = [
-  '#D9E8A8',
-  '#F9A8B6',
-  '#CDE0E8',
-  '#F9B384',
-  '#F9D368',
-  '#D4C4F0',
-  '#B8E0D2',
+  '#C5CA8A',
+  '#E7A3A3',
+  '#BEC3BC',
+  '#E89569',
+  '#E8C44A',
+  '#D4C4E8',
+  '#A9D4C4',
 ] as const
 
 export const NOTEBOOK_COVERS = NOTE_COLORS
@@ -18,7 +18,7 @@ export const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000
 export type SortKey = 'newest' | 'oldest' | 'title' | 'tag'
 export type FilterKey = 'all' | 'open' | 'done' | 'due' | 'archived' | 'trash'
 export type TemplateKey = 'meeting' | 'idea' | 'daily'
-export type AppTab = 'notes' | 'notebooks' | 'you'
+export type AppTab = 'notes' | 'notebooks' | 'plan' | 'you'
 
 export type Attachment = {
   id: string
@@ -86,6 +86,20 @@ export type SavedTemplate = {
   dueTime?: string | null
   alertMinutes?: number
   createdAt: number
+}
+
+export type Habit = {
+  id: string
+  ownerEmail: string
+  name: string
+  color: string
+  createdAt: number
+}
+
+export type HabitCheck = {
+  ownerEmail: string
+  habitId: string
+  date: string
 }
 
 export type QueuedMutation = {

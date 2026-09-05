@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { applyTemplate, dailyNoteTitle, findDailyNote, templateFromSaved } from './templates.ts'
-import { cardBodyPreview, checklistProgress, highlightSegments, insertChecklist, insertImageMarkdown, parseMarkdown, toggleTaskLine, wordCount } from './markdown.ts'
+import { cardBodyPreview, cardSurface, checklistProgress, highlightSegments, insertChecklist, insertImageMarkdown, parseMarkdown, toggleTaskLine, wordCount } from './markdown.ts'
 import { createNotebook } from './notebooks.ts'
 import { createSampleNotes } from './seed.ts'
 import { exportNotesJson, exportNotesMarkdown, importNotesJson, parseNoteIdFromSearch, sharePath } from './export.ts'
@@ -12,9 +12,23 @@ import { NOTE_COLORS, randomNoteColor } from './types.ts'
 import { belongsToOwner, normalizeNote } from './normalize.ts'
 import { LABEL_PRESETS, labelTint } from './labels.ts'
 import { backlinksTo, findNoteByTitle, insertWikiLink, parseWikiLinks, wikiSegments } from './backlinks.ts'
-import { blobMarkdownSrc, collectBlobIds, dataUrlToBlob } from './blobs.ts'
+import { blobMarkdownSrc, collectBlobIds, dataUrlToBlob, firstNoteCover } from './blobs.ts'
 import { compactMutations, formatBytes, shouldEnqueue } from './queue.ts'
-import { isolateBundle, isolateNotes } from './isolation.ts'
+import { isolateBundle, isolateHabits, isolateNotes } from './isolation.ts'
+import { greetingForHour, noteDashboard, sparkPath } from './dashboard.ts'
+import { noteAgenda } from './agenda.ts'
+import {
+  bestStreak,
+  buildHeatmap,
+  createHabit,
+  currentStreak,
+  hasCheck,
+  heatLevel,
+  heatmapWeeks,
+  mondayIndex,
+  toggleHabitCheck,
+  weekEndSunday,
+} from './habits.ts'
 
 test('normalize maps job-card fields onto note fields', () => {
   const note = normalizeNote({
@@ -35,9 +49,10 @@ test('normalize maps job-card fields onto note fields', () => {
   assert.equal(note.trashedAt, null)
 })
 
-test('sample notes are personal, pastel, and few', () => {
+test('sample notes are personal, pastel, and plentiful', () => {
   const notes = createSampleNotes('ada@notes.dev')
-  assert.ok(notes.length >= 6 && notes.length <= 8)
+  assert.ok(notes.length >= 80 && notes.length <= 120)
+  assert.equal(new Set(notes.map((note) => note.id)).size, notes.length)
   assert.equal(notes[0].pinned, true)
   assert.ok(notes.every((note) => note.ownerEmail === 'ada@notes.dev'))
   assert.ok(notes.some((note) => note.dueAt))
@@ -45,6 +60,10 @@ test('sample notes are personal, pastel, and few', () => {
   assert.ok(notes.every((note) => note.labels.length > 0))
   assert.ok(notes.some((note) => note.body.includes('[[Quotes]]')))
   assert.ok(notes.some((note) => note.body.includes('[[Book ideas]]')))
+  assert.ok(notes.some((note) => note.body.includes('data:image/svg+xml')))
+  assert.ok(new Set(notes.map((note) => note.notebookId)).size >= 5)
+  assert.ok(notes.some((note) => note.body.includes('- [ ]')))
+  assert.ok(notes.some((note) => !note.body.includes('- [')))
 })
 
 test('timestamp, preview, and random pastel color', () => {
@@ -87,6 +106,13 @@ test('toggle markdown task lines and progress', () => {
   assert.equal(toggleTaskLine(body, 2), 'Intro\n- [ ] Write tests\n- [ ] Done')
   assert.equal(toggleTaskLine(body, 0), body)
   assert.deepEqual(checklistProgress(body), { total: 2, done: 1 })
+  const surface = cardSurface('Milk run\n- [x] Oat milk\n- [ ] Bread\n- [ ] Coffee\n- [ ] Tea\n- [ ] Fruit\n- [ ] Rice')
+  assert.equal(surface.progress.total, 6)
+  assert.equal(surface.progress.done, 1)
+  assert.equal(surface.shownTasks.length, 6)
+  assert.equal(surface.extraTasks, 0)
+  assert.equal(surface.prose, 'Milk run')
+  assert.equal(cardSurface('Gifts\n• Mom\n• Dad').shownBullets.length, 2)
 })
 
 test('share link parsing', () => {
@@ -339,7 +365,17 @@ test('blob refs stay out of the note document', () => {
   assert.deepEqual(collectBlobIds(note).sort(), ['att-9-1', 'att-9-2'])
   const blob = dataUrlToBlob('data:text/plain;base64,aGk=')
   assert.equal(blob.type, 'text/plain')
+  const svg = dataUrlToBlob(`data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"></svg>')}`)
+  assert.equal(svg.type, 'image/svg+xml')
+  assert.ok(svg.size > 0)
   assert.equal(cardBodyPreview(note.body), '')
+  const cover = firstNoteCover(note)
+  assert.equal(cover?.blobId, 'att-9-1')
+  const painted = firstNoteCover({
+    body: '![pasta](data:image/svg+xml,abc)\nDinner',
+    attachments: [],
+  })
+  assert.equal(painted?.src, 'data:image/svg+xml,abc')
 })
 
 test('daily note is found by today title', () => {
@@ -368,6 +404,54 @@ test('accounts never mix notes across emails', () => {
   assert.deepEqual(bundle.notebooks.map((item) => item.id), ['inbox'])
 })
 
+test('dashboard turns notes into progress, due lists, and a week spark', () => {
+  const notes = [
+    normalizeNote({ id: 1, title: 'Pin me', pinned: true, body: '- [x] One\n- [ ] Two', notebookId: 'inbox', notebook: 'Inbox' }, 0, 'ada@notes.dev'),
+    normalizeNote({ id: 2, title: 'Pay rent', dueAt: '2026-09-03', notebookId: 'personal', notebook: 'Personal' }, 1, 'ada@notes.dev'),
+    normalizeNote({ id: 3, title: 'Done', confirmed: true, notebookId: 'work', notebook: 'Work' }, 2, 'ada@notes.dev'),
+  ]
+  const books = [
+    { id: 'inbox', ownerEmail: 'ada@notes.dev', name: 'Inbox', color: '#E8C44A', createdAt: 1 },
+    { id: 'personal', ownerEmail: 'ada@notes.dev', name: 'Personal', color: '#E7A3A3', createdAt: 2 },
+    { id: 'work', ownerEmail: 'ada@notes.dev', name: 'Work', color: '#BEC3BC', createdAt: 3 },
+  ]
+  const board = noteDashboard(notes, books, '2026-09-03', Date.parse('2026-09-03T12:00:00'))
+  assert.equal(board.live, 3)
+  assert.equal(board.done, 1)
+  assert.equal(board.open, 2)
+  assert.equal(board.tasks.total, 2)
+  assert.equal(board.tasks.done, 1)
+  assert.equal(board.percent, 50)
+  assert.equal(board.due[0].id, 2)
+  assert.equal(board.featured?.id, 1)
+  assert.equal(board.week.length, 7)
+  assert.match(sparkPath([0, 2, 1]), /^M/)
+})
+
+test('dashboard greeting follows the time of day', () => {
+  assert.equal(greetingForHour(8), 'Good morning')
+  assert.equal(greetingForHour(15), 'Good afternoon')
+  assert.equal(greetingForHour(21), 'Good evening')
+})
+
+test('agenda groups overdue, today, soon, and open lists', () => {
+  const notes = [
+    normalizeNote({ id: 1, title: 'Late', dueAt: '2026-09-01' }, 0, 'ada@notes.dev'),
+    normalizeNote({ id: 2, title: 'Now', dueAt: '2026-09-03', dueTime: '18:00' }, 1, 'ada@notes.dev'),
+    normalizeNote({ id: 3, title: 'Next week', dueAt: '2026-09-08' }, 2, 'ada@notes.dev'),
+    normalizeNote({ id: 4, title: 'Far', dueAt: '2026-10-01' }, 3, 'ada@notes.dev'),
+    normalizeNote({ id: 5, title: 'Shop', body: '- [ ] Milk\n- [x] Bread' }, 4, 'ada@notes.dev'),
+    normalizeNote({ id: 6, title: 'Done list', body: '- [x] All', dueAt: '2026-09-03' }, 5, 'ada@notes.dev'),
+    normalizeNote({ id: 7, title: 'Trashed', dueAt: '2026-09-01', trashedAt: 9 }, 6, 'ada@notes.dev'),
+  ]
+  const agenda = noteAgenda(notes, '2026-09-03')
+  assert.deepEqual(agenda.overdue.map((note) => note.id), [1])
+  assert.deepEqual(agenda.dueToday.map((note) => note.id), [2, 6])
+  assert.deepEqual(agenda.soon.map((note) => note.id), [3])
+  assert.deepEqual(agenda.lists.map((note) => note.id), [5])
+  assert.equal(agenda.waiting, 5)
+})
+
 test('mutation queue ignores noise and keeps last write', () => {
   assert.equal(shouldEnqueue('account.opened'), false)
   assert.equal(shouldEnqueue('note.saved'), true)
@@ -380,3 +464,41 @@ test('mutation queue ignores noise and keeps last write', () => {
   assert.deepEqual(queued.map((item) => item.kind), ['note.deleted'])
   assert.equal(formatBytes(2048), '2 KB')
 })
+
+test('habit heatmap weeks start on Monday and end on this Sunday', () => {
+  assert.equal(mondayIndex('2026-09-03'), 3)
+  assert.equal(weekEndSunday('2026-09-03'), '2026-09-06')
+  const weeks = heatmapWeeks('2026-09-03', 2)
+  assert.equal(weeks.length, 2)
+  assert.equal(weeks[0][0], '2026-08-24')
+  assert.equal(weeks[1][6], '2026-09-06')
+  assert.equal(heatLevel(0, 3), 0)
+  assert.equal(heatLevel(1, 1), 3)
+  assert.equal(heatLevel(1, 4), 1)
+  assert.equal(heatLevel(4, 4), 4)
+})
+
+test('habit streaks and check toggles stay on one account', () => {
+  const habit = createHabit('Ada@Notes.dev', 'Write', '#C5CA8A', 100)
+  assert.equal(habit.ownerEmail, 'ada@notes.dev')
+  assert.match(habit.id, /^hab-write-/)
+  let checks = toggleHabitCheck([], 'ada@notes.dev', habit.id, '2026-09-01').checks
+  checks = toggleHabitCheck(checks, 'ada@notes.dev', habit.id, '2026-09-02').checks
+  checks = toggleHabitCheck(checks, 'ada@notes.dev', habit.id, '2026-09-03').checks
+  assert.equal(hasCheck(checks, habit.id, '2026-09-03'), true)
+  assert.equal(currentStreak(['2026-09-01', '2026-09-02', '2026-09-03'], '2026-09-03'), 3)
+  assert.equal(currentStreak(['2026-09-01', '2026-09-02'], '2026-09-03'), 2)
+  assert.equal(currentStreak(['2026-08-30'], '2026-09-03'), 0)
+  assert.equal(bestStreak(['2026-09-01', '2026-09-02', '2026-09-04', '2026-09-05', '2026-09-06']), 3)
+  checks = toggleHabitCheck(checks, 'ada@notes.dev', habit.id, '2026-09-03').checks
+  assert.equal(hasCheck(checks, habit.id, '2026-09-03'), false)
+  const mixed = [
+    { ownerEmail: 'ada@notes.dev', habitId: 'a', date: '2026-09-01' },
+    { ownerEmail: 'sam@notes.dev', habitId: 'b', date: '2026-09-01' },
+  ]
+  assert.deepEqual(isolateHabits([{ ...habit, ownerEmail: 'sam@notes.dev' }, habit], 'ada@notes.dev').map((item) => item.id), [habit.id])
+  const grid = buildHeatmap(mixed.filter((item) => item.ownerEmail === 'ada@notes.dev'), '2026-09-03', null, 1)
+  assert.equal(grid[0].some((day) => day.date === '2026-09-01' && day.count === 1), true)
+  assert.equal(grid[0].find((day) => day.date === '2026-09-06')?.future, true)
+})
+

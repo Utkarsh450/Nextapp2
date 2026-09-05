@@ -2,6 +2,7 @@
 
 import { Check } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { tickHaptic } from '@/lib/native/haptics'
 
 export default function PaytmTick({
   active,
@@ -21,6 +22,7 @@ export default function PaytmTick({
         event.stopPropagation()
         onToggle()
         if (!active) {
+          tickHaptic()
           setPlaying(true)
           window.clearTimeout(timer.current)
           timer.current = window.setTimeout(() => setPlaying(false), 1200)

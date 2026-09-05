@@ -1,6 +1,6 @@
 "use client"
 
-import { Plus } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useRef } from 'react'
 
 export default function Fab({
@@ -50,13 +50,13 @@ export default function Fab({
       onPointerUp={clear}
       onPointerCancel={clear}
       onPointerLeave={clear}
-      className="fab-press fixed z-40 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--paper)] shadow-[0_12px_28px_rgba(18,18,20,0.28)]"
+      className="fab-press fixed z-40 flex h-16 w-16 items-center justify-center rounded-full bg-[#1a1814] text-[#f6eee4] shadow-[0_10px_24px_rgba(26,24,20,0.28)]"
       style={{
         right: 'max(1rem, env(safe-area-inset-right))',
         bottom: 'calc(5.25rem + env(safe-area-inset-bottom))',
       }}
     >
-      <Plus size={28} strokeWidth={2.2} />
+      <Pencil size={26} strokeWidth={1.8} />
     </button>
   )
 }

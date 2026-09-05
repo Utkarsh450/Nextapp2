@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AuthSession } from '@/lib/auth'
 import { authFetch, clearAuthToken, loadAuthOrigin, readAuthToken, writeAuthToken } from '@/lib/auth/client'
 import { peekAuthToken } from '@/lib/auth/offlineSession'
-import { applyThemeClass, readTheme, writeTheme, type ThemeMode } from '@/lib/theme'
+import { applyLayoutClass, applySkinClass, applyThemeClass, readLayout, readSkin, readTheme, writeLayout, writeSkin, writeTheme, type BoardLayout, type PaperSkin, type ThemeMode } from '@/lib/theme'
 
 export const useTheme = () => {
   const [theme, setTheme] = useState<ThemeMode>('light')
@@ -27,6 +27,52 @@ export const useTheme = () => {
   }, [])
 
   return { theme, toggle }
+}
+
+export const useSkin = () => {
+  const [skin, setSkin] = useState<PaperSkin>('classic')
+
+  useEffect(() => {
+    const next = readSkin()
+    applySkinClass(next)
+    if (next !== 'classic') {
+      // Hydrate from localStorage after mount to avoid a server/client mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only available on the client
+      setSkin(next)
+    }
+  }, [])
+
+  const setPaperSkin = useCallback((next: PaperSkin) => {
+    setSkin(next)
+    writeSkin(next)
+    applySkinClass(next)
+  }, [])
+
+  return { skin, setPaperSkin }
+}
+
+export const useLayout = () => {
+  const [layout, setLayout] = useState<BoardLayout>('masonry')
+
+  useEffect(() => {
+    const next = readLayout()
+    applyLayoutClass(next)
+    if (next !== 'masonry') {
+      // Hydrate from localStorage after mount to avoid a server/client mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only available on the client
+      setLayout(next)
+    } else {
+      applyLayoutClass('masonry')
+    }
+  }, [])
+
+  const setBoardLayout = useCallback((next: BoardLayout) => {
+    setLayout(next)
+    writeLayout(next)
+    applyLayoutClass(next)
+  }, [])
+
+  return { layout, setBoardLayout }
 }
 
 const localSession = () => peekAuthToken(readAuthToken())

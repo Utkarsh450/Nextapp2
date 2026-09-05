@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import OtpBoxes from '@/components/ui/OtpBoxes'
+import PaperStage from '@/components/ui/PaperStage'
+import { BlobSticker, CardTape, HeartSticker, SquiggleSticker } from '@/components/ui/PaperStickers'
 import type { AuthSession } from '@/lib/auth'
 
 export default function AuthScreen({
@@ -52,82 +54,114 @@ export default function AuthScreen({
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col justify-end overflow-hidden bg-[#D9E8A8] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] sm:justify-center">
-      <div className="pointer-events-none absolute -left-16 top-10 h-56 w-56 rounded-full bg-[#F9A8B6]/80 blur-2xl" />
-      <div className="pointer-events-none absolute right-0 top-32 h-64 w-64 rounded-full bg-[#CDE0E8] blur-2xl" />
-      <div className="pointer-events-none absolute bottom-24 left-10 h-40 w-40 rounded-full bg-[#F9D368]/90 blur-xl" />
+    <PaperStage scene="auth">
+      <div
+        className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(6.4rem,calc(env(safe-area-inset-top)+5.2rem))]"
+      >
+        <div className="flex flex-1 flex-col justify-center">
+          <p className="text-sm font-medium text-[var(--muted)]">{sent ? 'Almost there' : 'Your notebook'}</p>
+          <h1 className="mt-1 max-w-[10ch] text-[2.85rem] font-bold leading-[0.92] tracking-[-0.05em] text-[var(--ink)] sm:text-6xl">
+            {sent ? 'Enter the code' : (
+              <>
+                Write it
+                {' '}
+                <span className="relative inline-block pb-2">
+                  down
+                  <span className="absolute -bottom-0.5 left-0 h-4 w-full text-[#E89569]">
+                    <SquiggleSticker />
+                  </span>
+                </span>
+              </>
+            )}
+          </h1>
+          <p className="mt-4 max-w-[18rem] text-[1.02rem] leading-relaxed text-[var(--ink)]/70">
+            {viaTerminal
+              ? 'The six digits are waiting in the terminal running this app.'
+              : sent
+                ? `We sent a short code to ${email}. It fades in 10 minutes.`
+                : 'A quiet board for lists and little ideas. No password — just a code.'}
+          </p>
 
-      <div className="relative mx-auto w-full max-w-md animate-fade-up">
-        <p className="text-[0.7rem] font-medium uppercase tracking-[0.22em] text-zinc-700/70">Personal notes</p>
-        <h1 className="mt-3 max-w-[12ch] text-5xl font-semibold leading-[0.95] tracking-tight text-zinc-900 sm:text-6xl">
-          Write it down.
-        </h1>
-        <p className="mt-4 max-w-sm text-base leading-relaxed text-zinc-700/85">
-          {viaTerminal
-            ? 'The 6-digit code is printed in the terminal running the app.'
-            : sent
-              ? 'Check your inbox for a 6-digit code. It expires in 10 minutes.'
-              : 'A quiet place for lists, ideas, and reminders. Sign in with email — no password.'}
-        </p>
+          <div className="relative mt-8">
+            <CardTape className="-top-3 left-8" />
+            <span className="paper-sticker pointer-events-none absolute -bottom-5 -left-2 z-0 h-11 w-11" style={{ ['--tilt' as string]: '-18deg' }}>
+              <HeartSticker />
+            </span>
+            <span className="paper-sticker pointer-events-none absolute -right-3 -top-7 z-0 h-12 w-12" style={{ ['--tilt' as string]: '16deg' }}>
+              <BlobSticker fill={sent ? '#C5CA8A' : '#E7A3A3'} />
+            </span>
 
-        <form
-          className="mt-8"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (sent) void verifyCode()
-            else void sendCode()
-          }}
-        >
-          <label className="block text-[0.7rem] font-medium uppercase tracking-wide text-zinc-700/70">
-            Email
-            <input
-              type="email"
-              required
-              autoFocus={!sent}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@email.com"
-              className="mt-2 min-h-14 w-full rounded-2xl bg-white/75 px-4 text-base outline-none ring-1 ring-black/5 placeholder:text-zinc-500"
-            />
-          </label>
-
-          {sent && viaTerminal && (
-            <p className="mt-4 rounded-2xl bg-white/70 px-4 py-3 text-sm leading-relaxed text-zinc-700">
-              Look in the terminal for a line like
-              {' '}
-              <span className="font-mono text-[0.75rem]">[notes otp] you@email.com → 123456</span>.
-            </p>
-          )}
-
-          {sent && (
-            <div className="mt-5">
-              <p className="text-[0.7rem] font-medium uppercase tracking-wide text-zinc-700/70">Code</p>
-              <OtpBoxes value={otp} onChange={setOtp} />
-            </div>
-          )}
-
-          {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={busy || (sent && otp.length !== 6)}
-            className="mt-6 min-h-14 w-full rounded-full bg-zinc-900 text-base font-semibold text-white disabled:opacity-50"
-          >
-            {busy ? 'Please wait…' : sent ? 'Continue' : 'Send code'}
-          </button>
-
-          {sent && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void sendCode()}
-              className="mt-3 w-full text-center text-sm font-medium text-zinc-700"
+            <form
+              className="relative z-10 rounded-[32px] p-5 pt-6 text-[#2b261f]"
+              style={{ backgroundColor: sent ? '#E7A3A3' : '#C5CA8A' }}
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (sent) void verifyCode()
+                else void sendCode()
+              }}
             >
-              Resend code
-            </button>
+              {!sent ? (
+                <label className="block">
+                  <span className="text-[0.78rem] font-medium text-[#2b261f]/60">Email</span>
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@email.com"
+                    className="mt-2 min-h-14 w-full rounded-full bg-white/80 px-4 text-base outline-none placeholder:text-[#2b261f]/40"
+                  />
+                </label>
+              ) : (
+                <div>
+                  <p className="text-[0.78rem] font-medium text-[#2b261f]/60">Six digits</p>
+                  {viaTerminal && (
+                    <p className="mt-2 rounded-2xl bg-white/70 px-4 py-3 text-sm leading-relaxed">
+                      Look for
+                      {' '}
+                      <span className="font-mono text-[0.75rem]">[notes otp] {email} → 123456</span>
+                    </p>
+                  )}
+                  <OtpBoxes value={otp} onChange={setOtp} />
+                </div>
+              )}
+
+              {error && <p className="mt-4 text-sm font-medium text-[#7a2418]">{error}</p>}
+
+              <button
+                type="submit"
+                disabled={busy || (sent && otp.length !== 6)}
+                className="mt-5 min-h-14 w-full rounded-full bg-[#1a1814] text-base font-semibold text-white disabled:opacity-50"
+              >
+                {busy ? 'One moment…' : sent ? 'Open my board' : 'Send me a code'}
+              </button>
+            </form>
+          </div>
+
+          {sent ? (
+            <div className="mt-5 flex items-center justify-between px-1 text-sm font-medium text-[var(--ink)]/70">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setSent(false)
+                  setOtp('')
+                  setError('')
+                  setViaTerminal(false)
+                }}
+              >
+                Use another email
+              </button>
+              <button type="button" disabled={busy} onClick={() => void sendCode()}>
+                Send again
+              </button>
+            </div>
+          ) : (
+            <p className="mt-5 px-1 text-sm text-[var(--ink)]/55">We’ll keep this board just for you.</p>
           )}
-        </form>
+        </div>
       </div>
-    </div>
+    </PaperStage>
   )
 }

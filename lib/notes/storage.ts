@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import { TRASH_TTL_MS, LEGACY_STORAGE_KEY, SEARCH_RECENTS_LIMIT, type AccountBundle, type Attachment, type BlobRecord, type Note, type Notebook, type QueuedMutation, type SavedTemplate } from './types.ts'
+import { TRASH_TTL_MS, LEGACY_STORAGE_KEY, SEARCH_RECENTS_LIMIT, type AccountBundle, type Attachment, type BlobRecord, type Habit, type HabitCheck, type Note, type Notebook, type QueuedMutation, type SavedTemplate } from './types.ts'
 import { normalizeNote } from './normalize.ts'
 import { ensureNotebooks } from './notebooks.ts'
 import { createSampleNotes } from './seed.ts'
@@ -8,10 +8,11 @@ import {
   blobMarkdownSrc,
   blobToDataUrl,
   collectBlobIds,
+  dataUrlMime,
   dataUrlToBlob,
 } from './blobs.ts'
 import { compactMutations, formatBytes, shouldEnqueue } from './queue.ts'
-import { isolateBundle, isolateNotes, isolateTemplates } from './isolation.ts'
+import { isolateBundle, isolateHabitChecks, isolateHabits, isolateNotes, isolateTemplates } from './isolation.ts'
 
 type PrefRow = { key: string; value: unknown }
 
@@ -19,6 +20,8 @@ class NotesDatabase extends Dexie {
   notes!: Table<Note, [string, number]>
   notebooks!: Table<Notebook, [string, string]>
   templates!: Table<SavedTemplate, [string, string]>
+  habits!: Table<Habit, [string, string]>
+  habitChecks!: Table<HabitCheck, [string, string, string]>
   mutations!: Table<QueuedMutation, number>
   prefs!: Table<PrefRow, string>
   blobs!: Table<BlobRecord, [string, string]>
@@ -35,6 +38,10 @@ class NotesDatabase extends Dexie {
     this.version(2).stores({
       blobs: '[ownerEmail+id], ownerEmail, noteId',
     })
+    this.version(3).stores({
+      habits: '[ownerEmail+id], ownerEmail',
+      habitChecks: '[ownerEmail+habitId+date], ownerEmail, [ownerEmail+date], [ownerEmail+habitId]',
+    })
   }
 }
 
@@ -47,7 +54,9 @@ const getDb = () => {
 }
 
 const recentsKey = (email: string) => `search:${email}`
-const seedKey = (email: string) => `seeded:${email}`
+const seedKey = (email: string) => `seeded:v5:${email}`
+const SAMPLE_ID_MIN = 10_000
+const SAMPLE_ID_MAX = 12_000
 
 export const putNoteBlob = async (record: Omit<BlobRecord, 'blob'> & { blob: Blob }) => {
   const store = getDb()
@@ -128,7 +137,7 @@ const migrateNoteMedia = async (email: string, notes: Note[]) => {
         ownerEmail: email,
         noteId: note.id,
         name: item.alt || 'Image',
-        mime: /data:([^;]+)/.exec(item.dataUrl)?.[1] || 'image/jpeg',
+        mime: dataUrlMime(item.dataUrl) || 'image/jpeg',
         createdAt: Date.now(),
         blob: dataUrlToBlob(item.dataUrl),
       })
@@ -201,7 +210,7 @@ export const ingestImportedAttachments = async (ownerEmail: string, notes: Note[
         ownerEmail: email,
         noteId: note.id,
         name: item.alt || 'Image',
-        mime: /data:([^;]+)/.exec(item.dataUrl)?.[1] || 'image/jpeg',
+        mime: dataUrlMime(item.dataUrl) || 'image/jpeg',
         createdAt: Date.now(),
         blob: dataUrlToBlob(item.dataUrl),
       })
@@ -306,11 +315,20 @@ export const loadAccount = async (ownerEmail: string): Promise<AccountBundle> =>
   }
 
   const alreadySeeded = await store.prefs.get(seedKey(email))
-  if (notes.length === 0 && !alreadySeeded) {
-    notes = createSampleNotes(email)
-    await store.notes.bulkPut(notes)
+  if (!alreadySeeded) {
+    const samples = createSampleNotes(email)
+    const sampleIds = new Set(samples.map((note) => note.id))
+    const renamed = notes.filter((note) => {
+      const sample = samples.find((item) => item.id === note.id)
+      return Boolean(sample && note.title !== sample.title)
+    })
+    const keep = new Set(renamed.map((note) => note.id))
+    const nextSamples = samples.filter((note) => !keep.has(note.id))
+    const userNotes = notes.filter((note) => !sampleIds.has(note.id) && (note.id < SAMPLE_ID_MIN || note.id > SAMPLE_ID_MAX))
+    notes = [...nextSamples, ...renamed, ...userNotes]
+    if (nextSamples.length) await store.notes.bulkPut(nextSamples)
     await store.prefs.put({ key: seedKey(email), value: true })
-    await enqueueMutation(email, 'account.seeded', { count: notes.length })
+    if (nextSamples.length) await enqueueMutation(email, 'account.seeded', { count: nextSamples.length })
   }
 
   const cutoff = Date.now() - TRASH_TTL_MS
@@ -322,7 +340,11 @@ export const loadAccount = async (ownerEmail: string): Promise<AccountBundle> =>
   }
 
   notes = isolateNotes(notes, email)
-  notes = await migrateNoteMedia(email, notes)
+  try {
+    notes = await migrateNoteMedia(email, notes)
+  } catch {
+    // Keep notes even if an inline image cannot be moved into blob storage.
+  }
 
   const notebooks = ensureNotebooks(email, existingNotebooks)
   if (notebooks.length !== existingNotebooks.length) {
@@ -400,4 +422,49 @@ export const accountStorageStats = async (ownerEmail: string) => {
     if (typeof estimate.usage === 'number') usageLabel = formatBytes(estimate.usage)
   }
   return { pending: pending.length, notes, blobs, usageLabel }
+}
+
+export const loadHabits = async (ownerEmail: string) => {
+  const store = getDb()
+  const email = ownerEmail.trim().toLowerCase()
+  if (!store || !email) return { habits: [] as Habit[], checks: [] as HabitCheck[] }
+  const [habits, checks] = await Promise.all([
+    store.habits.where('ownerEmail').equals(email).toArray(),
+    store.habitChecks.where('ownerEmail').equals(email).toArray(),
+  ])
+  return {
+    habits: isolateHabits(habits, email).sort((a, b) => a.createdAt - b.createdAt),
+    checks: isolateHabitChecks(checks, email),
+  }
+}
+
+export const putHabit = async (habit: Habit) => {
+  const store = getDb()
+  if (!store) return
+  const email = habit.ownerEmail.trim().toLowerCase()
+  await store.habits.put({ ...habit, ownerEmail: email })
+}
+
+export const deleteHabitRecord = async (ownerEmail: string, id: string) => {
+  const store = getDb()
+  const email = ownerEmail.trim().toLowerCase()
+  if (!store || !email) return
+  await store.transaction('rw', store.habits, store.habitChecks, async () => {
+    await store.habits.delete([email, id])
+    await store.habitChecks.where('[ownerEmail+habitId]').equals([email, id]).delete()
+  })
+}
+
+export const putHabitCheck = async (check: HabitCheck) => {
+  const store = getDb()
+  if (!store) return
+  const email = check.ownerEmail.trim().toLowerCase()
+  await store.habitChecks.put({ ...check, ownerEmail: email })
+}
+
+export const deleteHabitCheck = async (ownerEmail: string, habitId: string, date: string) => {
+  const store = getDb()
+  const email = ownerEmail.trim().toLowerCase()
+  if (!store) return
+  await store.habitChecks.delete([email, habitId, date])
 }

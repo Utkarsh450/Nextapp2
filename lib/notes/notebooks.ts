@@ -1,11 +1,11 @@
 import { NOTEBOOK_COVERS, slugify, type Notebook } from './types.ts'
 
 export const DEFAULT_NOTEBOOKS: Array<{ id: string; name: string; color: string }> = [
-  { id: 'inbox', name: 'Inbox', color: '#F9D368' },
-  { id: 'work', name: 'Work', color: '#CDE0E8' },
-  { id: 'journal', name: 'Journal', color: '#B8E0D2' },
-  { id: 'ideas', name: 'Ideas', color: '#D4C4F0' },
-  { id: 'personal', name: 'Personal', color: '#F9A8B6' },
+  { id: 'inbox', name: 'Inbox', color: '#E8C44A' },
+  { id: 'work', name: 'Work', color: '#BEC3BC' },
+  { id: 'journal', name: 'Journal', color: '#A9D4C4' },
+  { id: 'ideas', name: 'Ideas', color: '#D4C4E8' },
+  { id: 'personal', name: 'Personal', color: '#E7A3A3' },
 ]
 
 export const defaultNotebooksFor = (ownerEmail: string, now = Date.now()): Notebook[] =>

@@ -1,6 +1,7 @@
 "use client"
 
 import { parseMarkdown, wikiSegments, blobIdFromSrc } from '@/lib/notes'
+import { tickHaptic } from '@/lib/native/haptics'
 
 export default function MarkdownPreview({
   body,
@@ -54,7 +55,10 @@ export default function MarkdownPreview({
               <input
                 type="checkbox"
                 checked={block.checked}
-                onChange={() => onToggleTask(block.line)}
+                onChange={() => {
+                  if (!block.checked) tickHaptic()
+                  onToggleTask(block.line)
+                }}
               />
               <span className={block.checked ? 'text-[var(--muted)] line-through' : ''}>
                 {linked(block.text, `t-${index}`)}

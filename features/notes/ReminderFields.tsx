@@ -22,8 +22,8 @@ export default function ReminderFields({
 
   return (
     <div className="space-y-2 sm:col-span-2">
-      <p className="mb-1 flex items-center gap-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">
-        <Bell size={12} /> Event · alert
+      <p className="mb-1 flex items-center gap-1.5 text-[0.78rem] font-medium text-[var(--muted)]">
+        <Bell size={13} /> When to ping you
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <label className="block">
@@ -39,7 +39,7 @@ export default function ReminderFields({
                 alertMinutes: next ? (alertMinutes < 0 ? 0 : alertMinutes) : -1,
               })
             }}
-            className="min-h-11 w-full rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
+            className="min-h-12 w-full rounded-full bg-white/80 px-4 py-2.5 text-sm outline-none dark:bg-white/5"
           />
         </label>
         <label className="block">
@@ -55,7 +55,7 @@ export default function ReminderFields({
                 alertMinutes: !dueTime && time && alertMinutes <= 0 ? 10 : alertMinutes,
               })
             }}
-            className="min-h-11 w-full rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none disabled:opacity-40 dark:bg-white/5"
+            className="min-h-12 w-full rounded-full bg-white/80 px-4 py-2.5 text-sm outline-none disabled:opacity-40 dark:bg-white/5"
           />
         </label>
       </div>

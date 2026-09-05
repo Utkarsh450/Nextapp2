@@ -19,6 +19,19 @@ export const blobIdsInBody = (body: string) => {
   return ids
 }
 
+export const firstNoteCover = (note: Pick<Note, 'body' | 'attachments'>) => {
+  const image = /!\[([^\]]*)\]\(([^)]+)\)/.exec(note.body)
+  if (image?.[2]) {
+    const blobId = blobIdFromSrc(image[2])
+    if (blobId) return { blobId, src: null as string | null }
+    return { blobId: null as string | null, src: image[2] }
+  }
+  const file = note.attachments.find((item) => isImageMime(item.mime) || Boolean(item.dataUrl))
+  if (!file) return null
+  if (file.dataUrl) return { blobId: null, src: file.dataUrl }
+  return { blobId: file.id, src: null }
+}
+
 export const collectBlobIds = (note: Pick<Note, 'body' | 'attachments'>) =>
   [...new Set([...note.attachments.map((item) => item.id), ...blobIdsInBody(note.body)])]
 
@@ -31,16 +44,30 @@ export const attachmentMeta = (item: Attachment): Attachment => ({
   createdAt: item.createdAt,
 })
 
+export const dataUrlMime = (dataUrl: string) =>
+  /data:([^;,]+)/i.exec(dataUrl)?.[1] || 'application/octet-stream'
+
 export const dataUrlToBlob = (dataUrl: string) => {
   const comma = dataUrl.indexOf(',')
   if (comma < 0) return new Blob()
   const header = dataUrl.slice(0, comma)
-  const data = dataUrl.slice(comma + 1)
-  const mime = /data:([^;]+)/.exec(header)?.[1] || 'application/octet-stream'
-  const binary = atob(data)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
-  return new Blob([bytes], { type: mime })
+  const payload = dataUrl.slice(comma + 1)
+  const mime = dataUrlMime(dataUrl)
+  if (/;base64/i.test(header)) {
+    try {
+      const binary = atob(payload)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      return new Blob([bytes], { type: mime })
+    } catch {
+      return new Blob([], { type: mime })
+    }
+  }
+  try {
+    return new Blob([decodeURIComponent(payload)], { type: mime })
+  } catch {
+    return new Blob([payload], { type: mime })
+  }
 }
 
 export const blobToDataUrl = (blob: Blob) =>

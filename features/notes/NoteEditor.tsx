@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  ChevronDown,
   Download,
   Eye,
   ImagePlus,
@@ -11,7 +12,7 @@ import {
   Pencil,
   X,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   NOTE_COLORS,
   LABEL_PRESETS,
@@ -25,12 +26,15 @@ import {
   linkableNotes,
   toggleTaskLine,
   wordCount,
+  formatDueChip,
+  todayISO,
   type Note,
   type Notebook,
 } from '@/lib/notes'
 import { appendSpoken, speechAvailable, startDictation } from '@/lib/native/speech'
 import { useAttachmentUrls } from '@/hooks/useAttachmentUrls'
 import { calendarAlertsAvailable } from '@/lib/native/notifications'
+import { CardTape } from '@/components/ui/PaperStickers'
 import MarkdownPreview from './MarkdownPreview'
 import ReminderFields from './ReminderFields'
 
@@ -65,6 +69,7 @@ export default function NoteEditor({
   const [listening, setListening] = useState(false)
   const [labelDraft, setLabelDraft] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [noteId, setNoteId] = useState(note.id)
   const imageRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -73,12 +78,20 @@ export default function NoteEditor({
   const count = wordCount(`${note.title} ${note.body}`)
   const incoming = useMemo(() => backlinksTo(note, notes), [note, notes])
   const others = useMemo(() => linkableNotes(notes, note.id), [note.id, notes])
+  const paper = note.color || '#C5CA8A'
+  const summary = [
+    note.notebook,
+    formatDueChip(note.dueAt, note.dueTime, todayISO()),
+    note.labels.length ? `${note.labels.length} label${note.labels.length === 1 ? '' : 's'}` : null,
+    note.tag || null,
+  ].filter(Boolean).join(' · ')
 
   if (note.id !== noteId) {
     setNoteId(note.id)
     setLabelDraft('')
     setLinkOpen(false)
     setPreview(false)
+    setDetailsOpen(false)
   }
 
   const patch = (partial: Partial<Note>) => {
@@ -106,151 +119,99 @@ export default function NoteEditor({
   }
 
   return (
-    <aside className="flex h-full max-h-[100dvh] w-full flex-col bg-[var(--paper)]">
-      <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
-      >
-        <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-[var(--muted)]">Note</p>
-        <button type="button" aria-label="Close editor" onClick={onClose} className="rounded-full p-2 text-[var(--muted)]">
-          <X size={18} />
-        </button>
-      </div>
+    <aside
+      className="relative flex h-full max-h-[100dvh] w-full flex-col overflow-hidden text-[#2b261f]"
+      style={{ backgroundColor: paper }}
+    >
+      <CardTape className="left-1/2 top-2 -translate-x-1/2" />
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-2">
+      <header
+        className="relative z-[1] flex items-center justify-between px-3 pb-1"
+        style={{ paddingTop: 'max(0.85rem, env(safe-area-inset-top))' }}
+      >
+        <button
+          type="button"
+          aria-label="Close editor"
+          onClick={onClose}
+          className="grid h-11 w-11 place-items-center rounded-full bg-white/70"
+        >
+          <X size={18} strokeWidth={1.8} />
+        </button>
+        <p className="text-sm font-medium text-[#2b261f]/70">{note.notebook || 'Inbox'}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-11 rounded-full bg-[#1a1814] px-4 text-sm font-semibold text-white"
+        >
+          Done
+        </button>
+      </header>
+
+      <div className="relative z-[1] flex-1 overflow-y-auto px-5 pb-4 pt-3">
         <input
           value={note.title}
           onChange={(event) => patch({ title: event.target.value })}
           placeholder="Title"
-          className="w-full bg-transparent text-[1.65rem] font-semibold tracking-tight outline-none"
+          className="w-full bg-transparent text-[2rem] font-bold leading-[1.05] tracking-[-0.045em] outline-none placeholder:text-[#2b261f]/35"
         />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input
-            value={note.tag}
-            onChange={(event) => patch({ tag: event.target.value })}
-            placeholder="Tag"
-            className="rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
-          />
-          <select
-            value={note.notebookId}
-            onChange={(event) => {
-              const notebook = notebooks.find((item) => item.id === event.target.value)
-              patch({ notebookId: event.target.value, notebook: notebook?.name ?? 'Inbox' })
-            }}
-            className="rounded-2xl bg-white/60 px-3 py-2.5 text-sm outline-none dark:bg-white/5"
-          >
-            {notebooks.map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
-          <ReminderFields
-            dueAt={note.dueAt}
-            dueTime={note.dueTime}
-            alertMinutes={note.alertMinutes}
-            native={calendarAlertsAvailable()}
-            onChange={(next) => patch(next)}
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Labels</p>
-          <div className="flex flex-wrap gap-2">
-            {note.labels.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="chip"
-                style={{ backgroundColor: `${labelTint(item)}99` }}
-                onClick={() => patch({ labels: note.labels.filter((label) => label !== item) })}
-              >
-                {item} ×
-              </button>
-            ))}
-          </div>
-          <form
-            className="flex gap-2"
-            onSubmit={(event) => {
-              event.preventDefault()
-              const next = labelDraft.trim()
-              if (!next || note.labels.includes(next)) return
-              patch({ labels: [...note.labels, next] })
-              setLabelDraft('')
-            }}
-          >
-            <input
-              value={labelDraft}
-              onChange={(event) => setLabelDraft(event.target.value)}
-              placeholder="Add a label"
-              className="min-h-11 flex-1 rounded-2xl bg-white/60 px-3 text-sm outline-none dark:bg-white/5"
-            />
-            <button type="submit" className="chip">Add</button>
-          </form>
-          <div className="flex flex-wrap gap-2">
-            {LABEL_PRESETS.filter((item) => !note.labels.includes(item)).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="chip"
-                onClick={() => patch({ labels: [...note.labels, item] })}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {NOTE_COLORS.map((color) => (
             <button
               key={color}
               type="button"
               aria-label={`Color ${color}`}
               onClick={() => patch({ color })}
-              className="h-7 w-7 rounded-full ring-1 ring-black/5"
-              style={{ backgroundColor: color, outline: note.color === color ? '2px solid var(--ink)' : undefined }}
+              className="h-7 w-7 rounded-full"
+              style={{
+                backgroundColor: color,
+                boxShadow: note.color === color ? 'inset 0 0 0 2px #2b261f, 0 0 0 2px rgba(255,255,255,0.9)' : 'inset 0 0 0 1px rgba(43,38,31,0.12)',
+              }}
             />
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => patch({ body: insertChecklist(note.body) })} className="chip">
-            <ListChecks size={14} /> Checklist
-          </button>
-          <button type="button" onClick={() => imageRef.current?.click()} className="chip">
-            <ImagePlus size={14} /> Image
-          </button>
-          <button type="button" onClick={() => fileRef.current?.click()} className="chip">
-            <Paperclip size={14} /> Attach
-          </button>
-          <button type="button" onClick={listen} className="chip">
-            <Mic size={14} /> {listening ? 'Listening…' : 'Voice'}
-          </button>
-          <button type="button" onClick={() => setLinkOpen((value) => !value)} className="chip">
-            <Link2 size={14} /> Link note
-          </button>
-          <button type="button" onClick={() => setPreview((value) => !value)} className="chip">
-            {preview ? <Pencil size={14} /> : <Eye size={14} />}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ToolChip onClick={() => patch({ body: insertChecklist(note.body) })}>
+            <ListChecks size={15} strokeWidth={1.8} /> Checklist
+          </ToolChip>
+          <ToolChip onClick={() => imageRef.current?.click()}>
+            <ImagePlus size={15} strokeWidth={1.8} /> Image
+          </ToolChip>
+          <ToolChip onClick={() => fileRef.current?.click()}>
+            <Paperclip size={15} strokeWidth={1.8} /> Attach
+          </ToolChip>
+          <ToolChip active={listening} onClick={listen}>
+            <Mic size={15} strokeWidth={1.8} /> {listening ? 'Listening…' : 'Voice'}
+          </ToolChip>
+          <ToolChip
+            active={linkOpen}
+            onClick={() => setLinkOpen((value) => !value)}
+          >
+            <Link2 size={15} strokeWidth={1.8} /> Link
+          </ToolChip>
+          <ToolChip active={preview} onClick={() => setPreview((value) => !value)}>
+            {preview ? <Pencil size={15} strokeWidth={1.8} /> : <Eye size={15} strokeWidth={1.8} />}
             {preview ? 'Edit' : 'Preview'}
-          </button>
-          <button type="button" onClick={() => onSaveTemplate(note)} className="chip">
-            Save as template
-          </button>
-          <button type="button" onClick={onExport} className="chip">
-            <Download size={14} /> Export
-          </button>
+          </ToolChip>
+          <ToolChip onClick={() => onSaveTemplate(note)}>Template</ToolChip>
+          <ToolChip onClick={onExport}>
+            <Download size={15} strokeWidth={1.8} /> Export
+          </ToolChip>
         </div>
 
         {linkOpen && (
-          <div className="rounded-2xl bg-white/60 p-3 dark:bg-white/5">
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Insert [[link]]</p>
+          <div className="mt-3 rounded-[24px] bg-white/65 p-3">
+            <p className="text-[0.78rem] font-medium text-[#2b261f]/60">Link another note</p>
             <div className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto">
               {others.length === 0 && (
-                <p className="text-sm text-[var(--muted)]">Give another note a title, then link it here.</p>
+                <p className="text-sm text-[#2b261f]/60">Give another note a title, then link it here.</p>
               )}
               {others.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="rounded-xl px-2 py-2 text-left text-sm"
+                  className="rounded-2xl px-3 py-2.5 text-left text-sm font-medium"
                   onClick={() => {
                     patch({ body: insertWikiLink(note.body, item.title) })
                     setLinkOpen(false)
@@ -264,30 +225,32 @@ export default function NoteEditor({
         )}
 
         {preview ? (
-          <MarkdownPreview
-            body={note.body}
-            blobUrls={blobUrls}
-            onToggleTask={(line) => patch({ body: toggleTaskLine(note.body, line) })}
-            onOpenLink={openLink}
-          />
+          <div className="mt-5 min-h-72 text-[#2b261f]">
+            <MarkdownPreview
+              body={note.body}
+              blobUrls={blobUrls}
+              onToggleTask={(line) => patch({ body: toggleTaskLine(note.body, line) })}
+              onOpenLink={openLink}
+            />
+          </div>
         ) : (
           <textarea
             value={note.body}
             onChange={(event) => patch({ body: event.target.value })}
             placeholder="Write here. Checklists use - [ ]. Link notes with [[Title]]."
-            className="min-h-64 w-full resize-y rounded-2xl bg-white/60 p-4 text-base leading-relaxed outline-none dark:bg-white/5"
+            className="mt-5 min-h-72 w-full resize-y bg-transparent text-[1.08rem] leading-[1.7] outline-none placeholder:text-[#2b261f]/40"
           />
         )}
 
         {note.attachments.length > 0 && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-3 gap-2">
             {note.attachments.map((file) => {
               const src = blobUrls[file.id] || file.dataUrl
               return (
                 <button
                   key={file.id}
                   type="button"
-                  className="relative overflow-hidden rounded-2xl bg-white/60 text-left dark:bg-white/5"
+                  className="relative overflow-hidden rounded-[22px] bg-white/65 text-left"
                   onClick={() => onRemoveAttachment(file.id)}
                 >
                   {src && isImageMime(file.mime) ? (
@@ -296,22 +259,117 @@ export default function NoteEditor({
                   ) : (
                     <span className="flex h-24 items-center px-2 text-xs">{file.name}</span>
                   )}
-                  <span className="absolute right-1 top-1 rounded-full bg-white/80 px-1.5 text-[0.65rem]">×</span>
+                  <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-white/90">
+                    <X size={12} />
+                  </span>
                 </button>
               )
             })}
           </div>
         )}
 
-        {(incoming.length > 0) && (
-          <div>
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)]">Linked from</p>
+        {incoming.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[0.78rem] font-medium text-[#2b261f]/60">Linked from</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {incoming.map((item) => (
-                <button key={item.id} type="button" className="chip" onClick={() => onOpenNote(item.id)}>
+                <button key={item.id} type="button" className="chip bg-white/70" onClick={() => onOpenNote(item.id)}>
                   {item.title || 'Untitled'}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="mt-5 flex min-h-12 w-full items-center justify-between rounded-full bg-white/60 px-4 text-left text-sm"
+          onClick={() => setDetailsOpen((value) => !value)}
+        >
+          <span className="min-w-0 truncate text-[#2b261f]/75">{summary || 'Notebook, due date, labels'}</span>
+          <ChevronDown size={16} className={`shrink-0 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {detailsOpen && (
+          <div className="mt-3 space-y-4 rounded-[28px] bg-white/65 p-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[0.78rem] font-medium text-[#2b261f]/60">Tag</span>
+                <input
+                  value={note.tag}
+                  onChange={(event) => patch({ tag: event.target.value })}
+                  placeholder="Work, home…"
+                  className="mt-1.5 min-h-12 w-full rounded-full bg-white/80 px-4 text-sm outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[0.78rem] font-medium text-[#2b261f]/60">Notebook</span>
+                <select
+                  value={note.notebookId}
+                  onChange={(event) => {
+                    const notebook = notebooks.find((item) => item.id === event.target.value)
+                    patch({ notebookId: event.target.value, notebook: notebook?.name ?? 'Inbox' })
+                  }}
+                  className="mt-1.5 min-h-12 w-full rounded-full bg-white/80 px-4 text-sm outline-none"
+                >
+                  {notebooks.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <ReminderFields
+                dueAt={note.dueAt}
+                dueTime={note.dueTime}
+                alertMinutes={note.alertMinutes}
+                native={calendarAlertsAvailable()}
+                onChange={(next) => patch(next)}
+              />
+            </div>
+            <div>
+              <p className="text-[0.78rem] font-medium text-[#2b261f]/60">Labels</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {note.labels.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className="chip"
+                    style={{ backgroundColor: `${labelTint(item)}99` }}
+                    onClick={() => patch({ labels: note.labels.filter((label) => label !== item) })}
+                  >
+                    {item} ×
+                  </button>
+                ))}
+              </div>
+              <form
+                className="mt-2 flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const next = labelDraft.trim()
+                  if (!next || note.labels.includes(next)) return
+                  patch({ labels: [...note.labels, next] })
+                  setLabelDraft('')
+                }}
+              >
+                <input
+                  value={labelDraft}
+                  onChange={(event) => setLabelDraft(event.target.value)}
+                  placeholder="Add a label"
+                  className="min-h-11 flex-1 rounded-full bg-white/80 px-4 text-sm outline-none"
+                />
+                <button type="submit" className="chip bg-white/80">Add</button>
+              </form>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {LABEL_PRESETS.filter((item) => !note.labels.includes(item)).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className="chip bg-white/70"
+                    onClick={() => patch({ labels: [...note.labels, item] })}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -342,12 +400,34 @@ export default function NoteEditor({
       </div>
 
       <div
-        className="flex items-center justify-between px-4 py-3 text-[0.75rem] text-[var(--muted)]"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        className="relative z-[1] flex items-center justify-between px-5 text-[0.78rem] text-[#2b261f]/60"
+        style={{ paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))' }}
       >
         <span>{count} words</span>
         <span>{note.notebook}</span>
       </div>
     </aside>
+  )
+}
+
+function ToolChip({
+  children,
+  onClick,
+  active,
+}: {
+  children: ReactNode
+  onClick: () => void
+  active?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-[0.8rem] font-medium ${
+        active ? 'bg-[#1a1814] text-white' : 'bg-white/65 text-[#2b261f]'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

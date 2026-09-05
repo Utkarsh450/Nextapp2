@@ -31,6 +31,7 @@ import {
   reminderFireDate,
   restoreFromTrash,
   trashNote,
+  toggleTaskLine,
   type FilterKey,
   type Note,
   type Notebook,
@@ -105,18 +106,24 @@ export const useNotes = (ownerEmail: string | null) => {
   useEffect(() => {
     let cancelled = false
     if (!ownerEmail) return
-    void loadAccount(ownerEmail).then(async (bundle) => {
-      if (cancelled) return
-      const owned = isolateNotes(bundle.notes, ownerEmail)
-      setNotes(owned)
-      setNotebooks(bundle.notebooks)
-      setTemplates(bundle.templates)
-      setRecents(bundle.recents)
-      setReady(true)
-      skipPersist.current = true
-      owned.forEach(queueReminder)
-      await refreshStorage(ownerEmail)
-    })
+    void loadAccount(ownerEmail)
+      .then(async (bundle) => {
+        if (cancelled) return
+        const owned = isolateNotes(bundle.notes, ownerEmail)
+        setNotes(owned)
+        setNotebooks(bundle.notebooks)
+        setTemplates(bundle.templates)
+        setRecents(bundle.recents)
+        setReady(true)
+        skipPersist.current = true
+        owned.forEach(queueReminder)
+        await refreshStorage(ownerEmail)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setReady(true)
+        setPersistError('Could not load notes')
+      })
     return () => {
       cancelled = true
     }
@@ -285,6 +292,10 @@ export const useNotes = (ownerEmail: string | null) => {
     patchNote(id, (note) => ({ ...note, confirmed: !note.confirmed, updatedAt: Date.now() }))
   }, [patchNote])
 
+  const toggleTask = useCallback((id: number, line: number) => {
+    patchNote(id, (note) => ({ ...note, body: toggleTaskLine(note.body, line), updatedAt: Date.now() }))
+  }, [patchNote])
+
   const reorder = useCallback((fromId: number, toId: number) => {
     setNotes((current) => moveNote(current, fromId, toId))
   }, [])
@@ -441,6 +452,7 @@ export const useNotes = (ownerEmail: string | null) => {
     togglePin,
     toggleArchive,
     toggleDone,
+    toggleTask,
     reorder,
     addNotebook,
     updateNotebook,

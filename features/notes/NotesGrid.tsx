@@ -8,7 +8,7 @@ function NotesGrid({
   notes,
   query,
   onOpen,
-  onToggleDone,
+  onToggleTask,
   onPin,
   onArchive,
   onDuplicate,
@@ -19,7 +19,7 @@ function NotesGrid({
   notes: Note[]
   query?: string
   onOpen: (id: number) => void
-  onToggleDone: (id: number) => void
+  onToggleTask?: (id: number, line: number) => void
   onPin: (id: number) => void
   onArchive: (id: number) => void
   onDuplicate: (id: number) => void
@@ -28,14 +28,15 @@ function NotesGrid({
   onDeleteForever?: (id: number) => void
 }) {
   return (
-    <div className="notes-grid px-4">
-      {notes.map((note) => (
+    <div className="notes-grid px-3.5">
+      {notes.map((note, index) => (
         <NoteCard
           key={note.id}
           note={note}
           query={query}
+          index={index}
           onOpen={onOpen}
-          onToggleDone={onToggleDone}
+          onToggleTask={onToggleTask}
           onPin={onPin}
           onArchive={onArchive}
           onDuplicate={onDuplicate}

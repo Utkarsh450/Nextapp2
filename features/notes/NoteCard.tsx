@@ -1,15 +1,20 @@
 "use client"
 
-import { memo, useState, type ReactNode } from 'react'
-import { Archive, Bookmark, Copy, MoreHorizontal, Paperclip, Pin, RotateCcw, Trash2 } from 'lucide-react'
-import PaytmTick from '@/components/ui/PaytmTick'
-import { cardBodyPreview, checklistProgress, formatDueChip, highlightSegments, labelTint, todayISO, type Note } from '@/lib/notes'
+import { memo, useRef, useState, type ReactNode } from 'react'
+import { Archive, Bookmark, Clock, Copy, Pin, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  cardSurface,
+  formatNoteTimestamp,
+  highlightSegments,
+  type Note,
+} from '@/lib/notes'
 
 function NoteCard({
   note,
   query,
+  index = 0,
   onOpen,
-  onToggleDone,
+  onToggleTask,
   onPin,
   onArchive,
   onDuplicate,
@@ -19,8 +24,9 @@ function NoteCard({
 }: {
   note: Note
   query?: string
+  index?: number
   onOpen: (id: number) => void
-  onToggleDone: (id: number) => void
+  onToggleTask?: (id: number, line: number) => void
   onPin: (id: number) => void
   onArchive: (id: number) => void
   onDuplicate: (id: number) => void
@@ -29,66 +35,102 @@ function NoteCard({
   onDeleteForever?: (id: number) => void
 }) {
   const [menu, setMenu] = useState(false)
-  const preview = cardBodyPreview(note.body, note.preview)
-  const tasks = checklistProgress(note.body)
-  const due = formatDueChip(note.dueAt, note.dueTime, todayISO())
+  const hold = useRef<number | null>(null)
+  const held = useRef(false)
+  const surface = cardSurface(note.body, note.preview)
+  const delay = Math.min(index, 8) * 30
+  const stamp = formatNoteTimestamp(note.updatedAt || note.createdAt)
+  const showTasks = surface.shownTasks.length > 0
+  const showBullets = !showTasks && surface.shownBullets.length > 0
+
+  const clearHold = () => {
+    if (hold.current) window.clearTimeout(hold.current)
+    hold.current = null
+  }
 
   return (
     <article
-      className="note-card group relative flex min-h-[240px] w-full cursor-pointer flex-col rounded-[var(--radius-card)] p-4 text-zinc-800 shadow-[var(--shadow-card)] ring-1 ring-black/5 sm:min-h-[260px] sm:p-5"
-      style={{ backgroundColor: note.color || '#F9D368' }}
-      onClick={() => onOpen(note.id)}
+      className="note-card note-card-enter group relative w-full cursor-pointer overflow-hidden text-[#2b261f] dark:text-[#f3eee6]"
+      style={{ ['--card' as string]: note.color || '#E8C44A', animationDelay: `${delay}ms` }}
+      onClick={() => {
+        if (menu) {
+          setMenu(false)
+          return
+        }
+        if (held.current) {
+          held.current = false
+          return
+        }
+        onOpen(note.id)
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        setMenu(true)
+      }}
+      onPointerDown={() => {
+        held.current = false
+        hold.current = window.setTimeout(() => {
+          held.current = true
+          setMenu(true)
+        }, 480)
+      }}
+      onPointerUp={clearHold}
+      onPointerCancel={clearHold}
+      onPointerLeave={clearHold}
     >
-      {note.pinned && !note.trashedAt && (
-        <span className="pin-fold" aria-label="Pinned" />
-      )}
-      <div className="flex items-start justify-between gap-2">
-        <PaytmTick active={note.confirmed} onToggle={() => onToggleDone(note.id)} />
-        <button
-          type="button"
-          aria-label="Note actions"
-          onClick={(event) => {
-            event.stopPropagation()
-            setMenu((value) => !value)
-          }}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/55 text-zinc-700"
-        >
-          <MoreHorizontal size={16} />
-        </button>
-      </div>
-      <h2 className="mt-3 text-[1.2rem] font-semibold leading-tight tracking-tight">
-        {highlightSegments(note.title || 'Untitled', query ?? '').map((part, index) => (
-          <span key={index} className={part.match ? 'bg-white/70' : undefined}>{part.text}</span>
-        ))}
-      </h2>
-      <p className="mt-2 line-clamp-6 flex-1 text-[15px] leading-relaxed text-zinc-800/80">
-        {highlightSegments(preview || 'Empty note', query ?? '').map((part, index) => (
-          <span key={index} className={part.match ? 'bg-white/70' : undefined}>{part.text}</span>
-        ))}
-      </p>
-      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 text-[0.7rem] text-zinc-700/80">
-        {note.notebook && <span className="rounded-full bg-white/50 px-2 py-0.5">{note.notebook}</span>}
-        {tasks.total > 0 && (
-          <span className="rounded-full bg-white/50 px-2 py-0.5">{tasks.done}/{tasks.total} done</span>
+      <div className="flex flex-col p-[1.15rem]">
+        {note.title.trim() ? (
+          <h2 className="text-[1.05rem] font-bold leading-snug tracking-[-0.02em]">
+            {highlightSegments(note.title, query ?? '').map((part, partIndex) => (
+              <span key={partIndex} className={part.match ? 'bg-white/70' : undefined}>{part.text}</span>
+            ))}
+          </h2>
+        ) : null}
+        {surface.prose && (
+          <p className={`text-[0.92rem] leading-[1.55] text-[#3a322c]/90 dark:text-[#f3eee6]/80 ${note.title.trim() ? 'mt-2' : ''} ${showTasks || showBullets ? 'line-clamp-4' : 'line-clamp-8'}`}>
+            {highlightSegments(surface.prose, query ?? '').map((part, partIndex) => (
+              <span key={partIndex} className={part.match ? 'bg-white/70' : undefined}>{part.text}</span>
+            ))}
+          </p>
         )}
-        {due && (
-          <span
-            className={`rounded-full px-2 py-0.5 ${due.startsWith('Overdue') ? 'bg-red-500/25 text-red-900' : 'bg-white/50'}`}
-          >
-            {due}
-          </span>
+        {showTasks && (
+          <ul className={`${note.title.trim() || surface.prose ? 'mt-3' : ''} space-y-2`}>
+            {surface.shownTasks.map((task) => (
+              <li key={`${task.line}-${task.text}`}>
+                <button
+                  type="button"
+                  className="flex w-full items-start gap-2.5 text-left text-[0.92rem] leading-[1.45] text-[#3a322c] dark:text-[#f3eee6]/85"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onToggleTask?.(note.id, task.line)
+                  }}
+                >
+                  <span className={`note-check ${task.checked ? 'is-done' : ''}`} aria-hidden="true" />
+                  <span className={task.checked ? 'text-[#3a322c]/45 line-through' : undefined}>
+                    {task.text || 'Item'}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
-        {note.attachments.length > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-white/50 px-2 py-0.5">
-            <Paperclip size={11} /> {note.attachments.length}
-          </span>
+        {showBullets && (
+          <ul className={`${note.title.trim() || surface.prose ? 'mt-3' : ''} space-y-1.5 pl-1`}>
+            {surface.shownBullets.map((item, itemIndex) => (
+              <li key={`${item.text}-${itemIndex}`} className="flex gap-2.5 text-[0.92rem] leading-[1.45] text-[#3a322c] dark:text-[#f3eee6]/85">
+                <span className="note-bullet" aria-hidden="true" />
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
         )}
-        {note.labels.slice(0, 3).map((item) => (
-          <span key={item} className="rounded-full px-2 py-0.5" style={{ backgroundColor: `${labelTint(item)}99` }}>{item}</span>
-        ))}
+        <p className="note-stamp mt-4 flex items-center gap-1.5">
+          <Clock size={13} strokeWidth={1.7} />
+          <span>{stamp}</span>
+        </p>
       </div>
       {menu && (
-        <div className="absolute right-3 top-14 z-10 min-w-40 overflow-hidden rounded-2xl bg-white/95 py-1 text-sm shadow-[var(--shadow-card)]">
+        <div className="absolute right-3 top-3 z-10 min-w-40 overflow-hidden rounded-2xl bg-[#fffaf3] py-1 text-sm shadow-[0_10px_28px_rgba(48,36,24,0.14)] ring-1 ring-black/5">
           {note.trashedAt ? (
             <>
               <MenuItem icon={<RotateCcw size={14} />} label="Restore" onClick={() => onRestore?.(note.id)} />
@@ -122,9 +164,10 @@ function MenuItem({
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-zinc-800 hover:bg-zinc-100"
+      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[#2b261f] hover:bg-black/5"
       onClick={(event) => {
         event.stopPropagation()
+        setMenu(false)
         onClick()
       }}
     >

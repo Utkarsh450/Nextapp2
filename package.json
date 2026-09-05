@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:notes": "node --experimental-strip-types --test lib/notes/notes.test.ts lib/auth/auth.test.ts lib/profile/profile.test.ts",
+    "test:notes": "node --experimental-strip-types --test lib/notes/notes.test.ts lib/auth/auth.test.ts lib/profile/profile.test.ts lib/onboarding.test.ts",
     "build:cap": "node scripts/build-capacitor.mjs",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",

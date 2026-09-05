@@ -85,6 +85,29 @@ export const cardBodyPreview = (body: string, preview = '') => {
     .trim()
 }
 
+export const cardSurface = (body: string, fallbackPreview = '') => {
+  const normalized = body.replace(/^•\s+/gm, '- ')
+  const blocks = parseMarkdown(normalized)
+  const tasks = blocks.filter((block): block is Extract<MarkdownBlock, { type: 'task' }> => block.type === 'task')
+  const bullets = blocks.filter((block): block is Extract<MarkdownBlock, { type: 'list' }> => block.type === 'list')
+  const progress = checklistProgress(normalized)
+  const prose = cardBodyPreview(normalized, fallbackPreview)
+    .replace(/^\s*- \[[ xX]\].*$/gm, '')
+    .replace(/^\s*-\s+.+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return {
+    tasks,
+    bullets,
+    shownTasks: tasks.slice(0, 6),
+    shownBullets: bullets.slice(0, 6),
+    extraTasks: Math.max(0, tasks.length - 6),
+    extraBullets: Math.max(0, bullets.length - 6),
+    prose,
+    progress,
+  }
+}
+
 export const highlightSegments = (text: string, query: string) => {
   const q = query.trim()
   if (!q) return [{ text, match: false }]
