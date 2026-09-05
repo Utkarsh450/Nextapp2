@@ -103,6 +103,23 @@ reading the code, not by comments flagging it.
 | Sample/starter content on first run | ✅ | `lib/notes/seed.ts`, ~90 hardcoded notes with generated SVG cover images — this is onboarding content, not a stub. |
 | Onboarding tooltips / coach marks | ❌ **Missing** | Not present anywhere — onboarding is only the 2-step name/skin form, no in-app tooltip overlay system. (Matches the porting brief's checklist item, confirmed absent, not an oversight in the audit.) |
 
+## 3b. Correctness bug found in the source app (not a design opinion — needs no product decision, just a fix in the Flutter port)
+
+**`features/notes/NoteCard.tsx` — the note context menu is currently broken.**
+`MenuItem` (line 155) is declared as a top-level sibling function, not
+nested inside `NoteCard`, but its `onClick` (line 170) calls `setMenu(false)`
+— a `useState` setter that only exists in `NoteCard`'s closure (line 37).
+Confirmed with `npx tsc --noEmit`: `error TS2304: Cannot find name
+'setMenu'`. Since that line runs *before* the real action handler
+(`onClick()` on line 171), **clicking any context-menu item (Pin, Archive,
+Duplicate, Open, Move to trash, Restore, Delete forever) throws instead of
+doing anything** in the current build. This means the ✅ statuses given to
+those actions earlier in this doc describe the intended/tested behavior at
+the data layer (`hooks/useNotes.ts`), not what actually happens when a user
+taps the menu today. **No product decision needed here** — the Flutter port
+should simply implement the menu correctly (call the handler, then close the
+menu), which is what the code obviously intended.
+
 ## 4. Orphaned / dead code (exclude from 1:1 port, flag for a product decision)
 
 | Item | Why it's dead | Recommendation |
