@@ -9,7 +9,10 @@ import 'package:notes_app/features/notes/presentation/notes_list_screen.dart';
 Widget _wrap(Widget child) {
   return ProviderScope(
     child: MaterialApp.router(
-      theme: buildAppTheme(skin: PaperSkin.classic, brightness: Brightness.light),
+      theme: buildAppTheme(
+        skin: PaperSkin.classic,
+        brightness: Brightness.light,
+      ),
       routerConfig: GoRouter(
         initialLocation: '/',
         routes: [
@@ -17,6 +20,12 @@ Widget _wrap(Widget child) {
           GoRoute(
             path: '/notes/:id',
             builder: (context, state) => const SizedBox(),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (context, state) => const SizedBox(),
+              ),
+            ],
           ),
         ],
       ),

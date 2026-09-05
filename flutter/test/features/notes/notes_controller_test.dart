@@ -49,6 +49,11 @@ void main() {
     );
     final notifier = container.read(notesControllerProvider.notifier);
 
+    // Not a cascade: this reads its own state back through the container
+    // between calls (see the `container.read(noteFilterKeyProvider...)`
+    // line right after), so `notifier..moveToTrash(...)` would misleadingly
+    // suggest these two calls are unrelated to that.
+    // ignore: cascade_invocations
     notifier.moveToTrash(target.id);
     container.read(noteFilterKeyProvider.notifier).set(NoteFilter.trash);
     expect(

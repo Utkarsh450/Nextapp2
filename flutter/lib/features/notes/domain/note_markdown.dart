@@ -20,10 +20,14 @@ class const TaskBlock({
 
 class const ListBlock({required final String text}) extends MarkdownBlock;
 
+class const ImageBlock({required final String src, required final String alt})
+    extends MarkdownBlock;
+
 class const ParagraphBlock({required final String text})
     extends MarkdownBlock;
 
 final RegExp _headingRe = RegExp(r'^(#{1,3})\s+(.*)$');
+final RegExp _imageRe = RegExp(r'^!\[([^\]]*)\]\((.+)\)$');
 final RegExp _taskRe = RegExp(r'^\s*- \[( |x|X)\]\s+(.*)$');
 final RegExp _listRe = RegExp(r'^\s*-\s+');
 
@@ -40,6 +44,12 @@ List<MarkdownBlock> parseMarkdown(String body) {
       blocks.add(
         HeadingBlock(level: heading.group(1)!.length, text: heading.group(2)!),
       );
+      continue;
+    }
+
+    final image = _imageRe.firstMatch(line.trim());
+    if (image != null) {
+      blocks.add(ImageBlock(src: image.group(2)!, alt: image.group(1)!));
       continue;
     }
 
@@ -63,6 +73,41 @@ List<MarkdownBlock> parseMarkdown(String body) {
     blocks.add(ParagraphBlock(text: line));
   }
   return blocks;
+}
+
+/// Appends a fresh `- [ ] ` line — matches `insertChecklist`.
+String insertChecklist(String body) {
+  final prefix = body.trim().isNotEmpty
+      ? '${body.replaceAll(RegExp(r'\s+$'), '')}\n'
+      : '';
+  return '$prefix- [ ] ';
+}
+
+/// Appends `![alt](src)` as its own paragraph — matches
+/// `insertImageMarkdown`. `src` is a `data:` URI in this build (see
+/// `note_card.dart`'s doc comment on why there's no separate blob store).
+String insertImageMarkdown(String body, String src, [String alt = 'image']) {
+  final prefix = body.trim().isNotEmpty
+      ? '${body.replaceAll(RegExp(r'\s+$'), '')}\n\n'
+      : '';
+  return '$prefix![$alt]($src)';
+}
+
+/// Matches `wordCount`.
+int wordCount(String text) {
+  final words = RegExp(r'\S+').allMatches(text.trim());
+  return words.length;
+}
+
+/// Appends dictated speech to the body with sensible punctuation-aware
+/// spacing — matches `lib/native/speech.ts`'s `appendSpoken`.
+String appendSpoken(String current, String spoken) {
+  final next = spoken.trim();
+  if (next.isEmpty) return current;
+  if (current.trim().isEmpty) return next;
+  final trimmedCurrent = current.trim();
+  final glue = RegExp(r'[\n.!?]$').hasMatch(trimmedCurrent) ? '\n' : ' ';
+  return '${current.replaceAll(RegExp(r'\s+$'), '')}$glue$next';
 }
 
 /// Toggles the checkbox on one body line, matching `toggleTaskLine`.

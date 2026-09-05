@@ -59,7 +59,7 @@ final class NotesControllerProvider
   }
 }
 
-String _$notesControllerHash() => r'9153aad5465f43641b54b834206c64decdecfb00';
+String _$notesControllerHash() => r'd42653724faff44b655a1962970583fa757d06d8';
 
 /// Holds the notes list itself.
 ///
@@ -548,3 +548,92 @@ final class UpcomingNoteRemindersProvider
 
 String _$upcomingNoteRemindersHash() =>
     r'1bbf76399757205cf0129d4c2350fae3a96cf751';
+
+/// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+/// `null` once a note is deleted forever while its editor is still open.
+
+@ProviderFor(noteById)
+final noteByIdProvider = NoteByIdFamily._();
+
+/// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+/// `null` once a note is deleted forever while its editor is still open.
+
+final class NoteByIdProvider extends $FunctionalProvider<Note?, Note?, Note?>
+    with $Provider<Note?> {
+  /// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+  /// `null` once a note is deleted forever while its editor is still open.
+  NoteByIdProvider._({
+    required NoteByIdFamily super.from,
+    required int super.argument,
+  }) : super(
+         retry: null,
+         name: r'noteByIdProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteByIdHash();
+
+  @override
+  String toString() {
+    return r'noteByIdProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<Note?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Note? create(Ref ref) {
+    final argument = this.argument as int;
+    return noteById(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Note? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Note?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NoteByIdProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$noteByIdHash() => r'7197a625ab4b55e2793735e828c2a4d6d5c94014';
+
+/// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+/// `null` once a note is deleted forever while its editor is still open.
+
+final class NoteByIdFamily extends $Family
+    with $FunctionalFamilyOverride<Note?, int> {
+  NoteByIdFamily._()
+    : super(
+        retry: null,
+        name: r'noteByIdProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+  /// `null` once a note is deleted forever while its editor is still open.
+
+  NoteByIdProvider call(int id) => NoteByIdProvider._(argument: id, from: this);
+
+  @override
+  String toString() => r'noteByIdProvider';
+}

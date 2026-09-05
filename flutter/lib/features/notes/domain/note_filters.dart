@@ -8,6 +8,17 @@ enum NoteFilter { all, open, done, due, archived, trash }
 
 enum NoteSort { newest, oldest, title, tag }
 
+/// Derives a `notebookId` from a typed notebook name — matches `slugify`
+/// in `lib/notes/types.ts`.
+String slugify(String name) {
+  final slug = name
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp('[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-|-$'), '');
+  return slug.isEmpty ? 'inbox' : slug;
+}
+
 /// `moveNote` — reorders [notes] by dragging `fromId` next to `toId`,
 /// writing back through `order` exactly as the source does. Kept even
 /// though drag-to-reorder UI is deferred to its own pass — see the

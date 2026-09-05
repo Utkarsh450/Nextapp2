@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- speech_to_text (note editor's voice dictation, see
+         lib/features/notes/presentation/note_editor_screen.dart). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="notes_app"
         android:name="${applicationName}"

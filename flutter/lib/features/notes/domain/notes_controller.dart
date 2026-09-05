@@ -1,7 +1,11 @@
+import 'dart:math';
+
 import 'package:collection/collection.dart';
+import 'package:notes_app/core/theme/tokens/note_swatches.dart';
 import 'package:notes_app/features/notes/domain/note.dart';
 import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_markdown.dart';
+import 'package:notes_app/features/notes/domain/note_reminders.dart';
 import 'package:notes_app/features/notes/domain/sample_notes.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -92,24 +96,101 @@ class NotesController extends _$NotesController {
   /// `duplicateNote` — copies title/body/color/labels; resets pin/archive/
   /// trash state and stamps a fresh id, matching the source's
   /// `duplicateNote`. Attachment cloning doesn't apply yet (see `note.dart`).
-  void duplicateNote(int id) {
-    final source = state.where((n) => n.id == id).firstOrNull;
-    if (source == null) return;
+  /// Returns the new note (or `null` if `id` doesn't exist) so the editor
+  /// can jump straight to it.
+  Note? duplicateNote(int id) {
+    final source = state.firstWhereOrNull((n) => n.id == id);
+    if (source == null) return null;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final copy = Note(
+    final title = source.title.isNotEmpty
+        ? '${source.title} copy'
+        : 'Untitled copy';
+    return saveNote(
+      Note(
+        id: now,
+        ownerEmail: source.ownerEmail,
+        title: title,
+        tag: source.tag,
+        notebookId: source.notebookId,
+        notebook: source.notebook,
+        body: source.body,
+        preview: source.preview,
+        color: source.color,
+        labels: source.labels,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  /// `saveNote` — the note editor's single write path: upserts the given
+  /// note by id (matching `hooks/useNotes.ts`'s `saveNote`), stamping
+  /// `updatedAt` and recomputing `preview` from `body`.
+  ///
+  /// This recomputes `preview` unconditionally, unlike the source's
+  /// `patch()` (`partial.preview ?? note.preview ?? …`) — that expression
+  /// never actually updates a note's `preview` after its first save, since
+  /// JS `??` doesn't fall through an empty string. `preview` barely
+  /// surfaces in the UI (`NoteCard` prefers `body` whenever it's non-empty
+  /// — see `cardBodyPreview`), so this is a low-stakes correctness fix, not
+  /// a behavior a screen depends on.
+  Note saveNote(Note note) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final trimmedBody = note.body.trim();
+    final stamped = note.copyWith(
+      updatedAt: now,
+      preview: trimmedBody.substring(0, min(80, trimmedBody.length)),
+    );
+    final exists = state.any((n) => n.id == stamped.id);
+    state = exists
+        ? [for (final n in state) if (n.id == stamped.id) stamped else n]
+        : [stamped, ...state];
+    return stamped;
+  }
+
+  /// `createBlank` — builds a new note (random color, "Inbox" notebook
+  /// unless given) and immediately saves it, matching the source
+  /// (`createBlank` ends by calling `saveNote`). Returns the created note
+  /// so the caller can navigate straight to its editor.
+  Note createBlank({
+    String title = '',
+    String tag = '',
+    String body = '',
+    String? notebookId,
+    String? notebook,
+    String? color,
+    List<String> labels = const [],
+    String? dueAt,
+    String? dueTime,
+    int? alertMinutes,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final ownerEmail = state.firstOrNull?.ownerEmail ?? 'you@notes.dev';
+    final blank = Note(
       id: now,
-      ownerEmail: source.ownerEmail,
-      title: source.title.isNotEmpty ? '${source.title} copy' : 'Untitled copy',
-      tag: source.tag,
-      notebookId: source.notebookId,
-      notebook: source.notebook,
-      body: source.body,
-      color: source.color,
-      labels: source.labels,
+      ownerEmail: ownerEmail,
+      title: title,
+      tag: tag,
+      body: body,
+      notebookId: notebookId ?? 'inbox',
+      notebook: notebook ?? 'Inbox',
+      color: color ?? _randomNoteColor(),
+      labels: labels,
       createdAt: now,
       updatedAt: now,
+    ).withReminder(
+      resolveReminderFields(
+        dueAt: dueAt,
+        dueTime: dueTime,
+        alertMinutes: alertMinutes,
+      ),
     );
-    state = [copy, ...state];
+    return saveNote(blank);
+  }
+
+  String _randomNoteColor() {
+    const palette = NoteSwatches.paletteHex;
+    return palette[Random().nextInt(palette.length)];
   }
 
   /// `reorder` — drag-to-reorder is a decided real feature per
@@ -210,3 +291,11 @@ List<String> noteColorOptions(Ref ref) =>
 @riverpod
 List<Note> upcomingNoteReminders(Ref ref) =>
     upcomingReminders(ref.watch(notesControllerProvider));
+
+/// Looks up one note by id, for the editor route (`/notes/:id/edit`).
+/// `null` once a note is deleted forever while its editor is still open.
+@riverpod
+Note? noteById(Ref ref, int id) {
+  final notes = ref.watch(notesControllerProvider);
+  return notes.firstWhereOrNull((n) => n.id == id);
+}

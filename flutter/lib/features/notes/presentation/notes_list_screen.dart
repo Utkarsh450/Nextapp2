@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -12,6 +14,16 @@ import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_labels.dart';
 import 'package:notes_app/features/notes/domain/notes_controller.dart';
 import 'package:notes_app/features/notes/presentation/note_card.dart';
+
+/// Creates a blank note and jumps straight into its editor. Stands in for
+/// the source's dock "+" → quick-capture flow (`AppTabs.tsx`/
+/// `CreateSheet.tsx`, feature-audit #9) — that dock isn't built yet, so
+/// this FAB/empty-state action is the one entry point into note creation
+/// for now.
+void _createAndEdit(BuildContext context, WidgetRef ref) {
+  final note = ref.read(notesControllerProvider.notifier).createBlank();
+  unawaited(context.push('/notes/${note.id}/edit'));
+}
 
 const List<(NoteFilter, String)> _filters = [
   (NoteFilter.all, 'All'),
@@ -42,6 +54,11 @@ class const NotesListScreen({super.key}) extends ConsumerWidget {
     final spacing = Theme.of(context).extension<AppSpacing>()!;
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _createAndEdit(context, ref),
+        tooltip: 'New note',
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -280,11 +297,7 @@ class const _NotesEmptyState({required final NoteFilter filterKey})
           ? 'No notes labeled $labelFilter.'
           : 'Write your first note',
       actionLabel: isTrash ? null : 'Write your first note',
-      onAction: isTrash
-          ? null
-          : () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Note editor — not built yet')),
-            ),
+      onAction: isTrash ? null : () => _createAndEdit(context, ref),
     );
   }
 }
@@ -306,7 +319,10 @@ class const _NotesResults({required final List<Note> shown})
         key: ValueKey(note.id),
         note: note,
         index: index,
-        onOpen: () => context.push('/notes/${note.id}'),
+        // NoteDetail (read-only view, feature-audit #7) isn't built yet —
+        // open straight into the editor so tapping a card isn't a dead
+        // end. See note_editor_screen.dart's doc comment.
+        onOpen: () => context.push('/notes/${note.id}/edit'),
         onToggleTask: (line) => controller.toggleTask(note.id, line),
         onToggleDone: () => controller.toggleDone(note.id),
         onPin: () => controller.togglePin(note.id),

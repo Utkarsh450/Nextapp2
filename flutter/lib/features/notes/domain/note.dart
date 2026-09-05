@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:notes_app/features/notes/domain/note_reminders.dart';
 
 /// Sentinel default for `copyWith`'s `trashedAt` parameter, so "clear the
 /// due-trash timestamp" (an explicit `null`) is distinguishable from
@@ -43,10 +44,11 @@ class const Note({
   final List<String> labels = const [],
   final int order = 0,
 }) {
-  /// `dueAt`/`dueTime`/`remindAt` can't be explicitly cleared through this
-  /// yet (only ever overwritten with a new value) — revisit once the note
-  /// editor needs that. `trashedAt` can, via the sentinel default: pass
-  /// `null` to clear it, or omit it to leave it alone.
+  /// `dueAt`/`dueTime`/`alertMinutes`/`remindAt` always change together as
+  /// one consistent set (mirroring the source's `reminderFields()`) — use
+  /// [withReminder] for those, not this. `trashedAt` can be explicitly
+  /// cleared via the sentinel default: pass `null` to clear it, or omit it
+  /// to leave it alone.
   Note copyWith({
     String? title,
     String? tag,
@@ -61,10 +63,6 @@ class const Note({
     bool? archived,
     Object? trashedAt = _unset,
     String? color,
-    String? dueAt,
-    String? dueTime,
-    int? alertMinutes,
-    String? remindAt,
     List<String>? labels,
     int? order,
   }) {
@@ -87,14 +85,42 @@ class const Note({
           ? this.trashedAt
           : trashedAt as int?,
       color: color ?? this.color,
-      dueAt: dueAt ?? this.dueAt,
-      dueTime: dueTime ?? this.dueTime,
-      alertMinutes: alertMinutes ?? this.alertMinutes,
-      remindAt: remindAt ?? this.remindAt,
+      dueAt: dueAt,
+      dueTime: dueTime,
+      alertMinutes: alertMinutes,
+      remindAt: remindAt,
       labels: labels ?? this.labels,
       order: order ?? this.order,
     );
   }
+
+  /// Replaces the due-date/alert set atomically — see
+  /// `note_reminders.dart`'s `resolveReminderFields`, which is what
+  /// computes a consistent [ReminderFields] to pass here.
+  Note withReminder(ReminderFields fields) => Note(
+    id: id,
+    ownerEmail: ownerEmail,
+    title: title,
+    tag: tag,
+    preview: preview,
+    notebookId: notebookId,
+    notebook: notebook,
+    logo: logo,
+    confirmed: confirmed,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+    body: body,
+    pinned: pinned,
+    archived: archived,
+    trashedAt: trashedAt,
+    color: color,
+    dueAt: fields.dueAt,
+    dueTime: fields.dueTime,
+    alertMinutes: fields.alertMinutes,
+    remindAt: fields.remindAt,
+    labels: labels,
+    order: order,
+  );
 
   @override
   bool operator ==(Object other) => other is Note && other.id == id;

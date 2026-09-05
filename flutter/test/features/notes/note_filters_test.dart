@@ -50,7 +50,7 @@ void main() {
 
     test('open/done filters split on confirmed', () {
       final notes = [
-        _note(id: 1, confirmed: false),
+        _note(id: 1),
         _note(id: 2, confirmed: true),
       ];
       expect(
@@ -79,14 +79,14 @@ void main() {
 
     test('pinned notes sort first regardless of sort key, except in trash', () {
       final notes = [
-        _note(id: 1, order: 0),
+        _note(id: 1),
         _note(id: 2, order: 1, pinned: true),
       ];
       expect(visibleNotes(notes: notes).first.id, 2);
 
       final trashed = [
         _note(id: 3, trashedAt: 1, pinned: true, order: 5),
-        _note(id: 4, trashedAt: 1, order: 0),
+        _note(id: 4, trashedAt: 1),
       ];
       final shownTrash = visibleNotes(
         notes: trashed,
@@ -98,7 +98,7 @@ void main() {
 
     test('color and label filters narrow the result', () {
       final notes = [
-        _note(id: 1, color: '#C5CA8A', labels: const ['Work']),
+        _note(id: 1, labels: const ['Work']),
         _note(id: 2, color: '#E7A3A3', labels: const ['Home']),
       ];
       expect(
