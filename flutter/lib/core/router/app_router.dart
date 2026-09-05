@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:notes_app/core/widgets/placeholder_screen.dart';
+import 'package:notes_app/features/notes/presentation/notes_list_screen.dart';
 import 'package:notes_app/shell/app_shell.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -8,8 +9,9 @@ part 'app_router.g.dart';
 /// Route table — mapped 1:1 to the screens enumerated in
 /// `docs/feature-audit.md` §1, per `docs/flutter-architecture.md` §3.
 ///
-/// **Scaffold-stage placeholder:** every branch renders [PlaceholderScreen]
-/// until its real screen is built. The `/auth` → `/onboarding` → shell
+/// **Scaffold-stage placeholder:** every branch except `/notes` still
+/// renders [PlaceholderScreen] until its real screen is built. The
+/// `/auth` → `/onboarding` → shell
 /// redirect guard (session-null / not-onboarded, mirroring the branch order
 /// in `NotesApp.tsx`) is **not yet wired** — it depends on the real
 /// `SessionNotifier`, which is built alongside the auth screen. Per the
@@ -42,8 +44,7 @@ final GoRouter _router = GoRouter(
           routes: [
             GoRoute(
               path: '/notes',
-              builder: (context, state) =>
-                  const PlaceholderScreen(title: 'Notes'),
+              builder: (context, state) => const NotesListScreen(),
               routes: [
                 GoRoute(
                   path: 'search',

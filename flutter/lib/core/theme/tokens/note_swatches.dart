@@ -9,15 +9,22 @@ import 'package:notes_app/core/utils/hex_color.dart';
 /// field always resolves through here, never through the paper palette.
 class const NoteSwatches({required final bool isDark})
     extends ThemeExtension<NoteSwatches> {
-  static const List<Color> _base = [
-    Color(0xFFC5CA8A), // olive
-    Color(0xFFE7A3A3), // dusty pink
-    Color(0xFFBEC3BC), // sage grey
-    Color(0xFFE89569), // terracotta
-    Color(0xFFE8C44A), // gold
-    Color(0xFFD4C4E8), // lavender
-    Color(0xFFA9D4C4), // mint
+  /// The 7 preset hex values, in source order — this is the form a
+  /// `Note.color`/`Notebook.color` field is actually stored and compared
+  /// as (`lib/notes/types.ts` `NOTE_COLORS`). Prefer [colors] for painting;
+  /// use this when you need the raw stored value, e.g. `labelTint`'s
+  /// deterministic hashing.
+  static const List<String> paletteHex = [
+    '#C5CA8A', // olive
+    '#E7A3A3', // dusty pink
+    '#BEC3BC', // sage grey
+    '#E89569', // terracotta
+    '#E8C44A', // gold
+    '#D4C4E8', // lavender
+    '#A9D4C4', // mint
   ];
+
+  static final List<Color> _base = paletteHex.map(colorFromHex).toList();
 
   static final Color _darkMixTarget = colorFromHex('#1c1814');
 
