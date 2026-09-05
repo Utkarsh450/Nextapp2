@@ -114,6 +114,7 @@ Client UI failure handling (`features/auth/AuthScreen.tsx`):
 
 - **CORS**: Not applicable here, because the native client never calls Apps Script directly — it calls the Next.js API, which calls Apps Script server-to-server (no browser CORS involved on that leg). If a future design instead has Flutter call Apps Script directly, Apps Script Web Apps don't return normal CORS headers by default and `doPost` would need to be adapted (and the redirect-following behavior above would need to be replicated in `dio`/`http` — set `followRedirects: false` and re-request the `Location` header manually, exactly like the Next.js code does).
 - **Recommendation: keep the current shape** — do not have Flutter call Apps Script directly (see next section).
+- **Decided (2026-09-05): confirmed.** No Apps Script changes needed. Flutter's `auth_service.dart` will call the redeployed Next.js `/api/auth/*` endpoints exactly as documented in §3, never the Apps Script URL/secret directly.
 
 ## 7. Architectural implication for the Flutter app (decision needed)
 
