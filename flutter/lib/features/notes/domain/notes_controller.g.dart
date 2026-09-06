@@ -393,6 +393,76 @@ abstract class _$NoteNotebookFilter extends $Notifier<String?> {
   }
 }
 
+/// `board.search` — shared between the main notes list and the search
+/// overlay (`search_overlay_screen.dart`), matching the source: typing in
+/// the search field live-filters [visibleNoteListProvider] too, not just
+/// the overlay's own match list.
+
+@ProviderFor(NoteSearchQuery)
+final noteSearchQueryProvider = NoteSearchQueryProvider._();
+
+/// `board.search` — shared between the main notes list and the search
+/// overlay (`search_overlay_screen.dart`), matching the source: typing in
+/// the search field live-filters [visibleNoteListProvider] too, not just
+/// the overlay's own match list.
+final class NoteSearchQueryProvider
+    extends $NotifierProvider<NoteSearchQuery, String> {
+  /// `board.search` — shared between the main notes list and the search
+  /// overlay (`search_overlay_screen.dart`), matching the source: typing in
+  /// the search field live-filters [visibleNoteListProvider] too, not just
+  /// the overlay's own match list.
+  NoteSearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'noteSearchQueryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteSearchQueryHash();
+
+  @$internal
+  @override
+  NoteSearchQuery create() => NoteSearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$noteSearchQueryHash() => r'c03e06ce8bef48fd69c278a4dda8ab455fe286d0';
+
+/// `board.search` — shared between the main notes list and the search
+/// overlay (`search_overlay_screen.dart`), matching the source: typing in
+/// the search field live-filters [visibleNoteListProvider] too, not just
+/// the overlay's own match list.
+
+abstract class _$NoteSearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(NoteBoardLayoutController)
 final noteBoardLayoutControllerProvider = NoteBoardLayoutControllerProvider._();
 
@@ -490,7 +560,59 @@ final class VisibleNoteListProvider
   }
 }
 
-String _$visibleNoteListHash() => r'f37183ab02c3f629b5b163893294559242bb4345';
+String _$visibleNoteListHash() => r'8a04c9358191374e23c2ac6ff901e553d726bf26';
+
+/// `searchHits` in `NotesApp.tsx` — always `all`/no-notebook, unlike
+/// [visibleNoteListProvider], but still respects the current label/color
+/// filter, matching the source exactly.
+
+@ProviderFor(searchHits)
+final searchHitsProvider = SearchHitsProvider._();
+
+/// `searchHits` in `NotesApp.tsx` — always `all`/no-notebook, unlike
+/// [visibleNoteListProvider], but still respects the current label/color
+/// filter, matching the source exactly.
+
+final class SearchHitsProvider
+    extends $FunctionalProvider<List<Note>, List<Note>, List<Note>>
+    with $Provider<List<Note>> {
+  /// `searchHits` in `NotesApp.tsx` — always `all`/no-notebook, unlike
+  /// [visibleNoteListProvider], but still respects the current label/color
+  /// filter, matching the source exactly.
+  SearchHitsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'searchHitsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$searchHitsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<Note>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<Note> create(Ref ref) {
+    return searchHits(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<Note> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<Note>>(value),
+    );
+  }
+}
+
+String _$searchHitsHash() => r'cdf2b69d434ff41d2a48750b97514b35d999f677';
 
 /// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
 /// recomputed only when the notes or notebooks it depends on change.
@@ -548,22 +670,19 @@ final class NoteDashboardDataProvider
 String _$noteDashboardDataHash() => r'6415a054f0f5adff615db3ee45c4b0e2f70248f1';
 
 /// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
-/// has no active filter of any kind. `search` isn't modeled yet (no
-/// search screen), so it's left out of this gate until one exists.
+/// has no active filter of any kind, search included.
 
 @ProviderFor(showTodayDashboard)
 final showTodayDashboardProvider = ShowTodayDashboardProvider._();
 
 /// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
-/// has no active filter of any kind. `search` isn't modeled yet (no
-/// search screen), so it's left out of this gate until one exists.
+/// has no active filter of any kind, search included.
 
 final class ShowTodayDashboardProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
   /// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
-  /// has no active filter of any kind. `search` isn't modeled yet (no
-  /// search screen), so it's left out of this gate until one exists.
+  /// has no active filter of any kind, search included.
   ShowTodayDashboardProvider._()
     : super(
         from: null,
@@ -598,7 +717,7 @@ final class ShowTodayDashboardProvider
 }
 
 String _$showTodayDashboardHash() =>
-    r'26d84f694b46f3ace1e78866262a0d644aa016a9';
+    r'bd9f32d5e7dba071fe8f8109d7fdb4823c4a5277';
 
 /// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
 /// counts keyed by `notebookId`, feeding both the Today dashboard's tiles

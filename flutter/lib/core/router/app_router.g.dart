@@ -12,14 +12,15 @@ part of 'app_router.dart';
 /// `docs/feature-audit.md` §1, per `docs/flutter-architecture.md` §3.
 ///
 /// The `/auth` → `/onboarding` → shell redirect guard mirrors the branch
-/// order in `NotesApp.tsx` (`if (!session) return <AuthScreen/>`, `if
-/// (!onboarded) return <OnboardingScreen/>`). One deliberate simplification:
+/// order in `NotesApp.tsx` (renders `AuthScreen` when there's no session,
+/// `OnboardingScreen` when there's a session but onboarding isn't done).
+/// One deliberate simplification:
 /// the source also has a `loading` branch while its session check makes a
 /// network round-trip — there's no backend here to await (session state is
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/notes/search` and `/you` still render
+/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
 /// [PlaceholderScreen] until their real screens are built.
 
 @ProviderFor(appRouter)
@@ -29,14 +30,15 @@ final appRouterProvider = AppRouterProvider._();
 /// `docs/feature-audit.md` §1, per `docs/flutter-architecture.md` §3.
 ///
 /// The `/auth` → `/onboarding` → shell redirect guard mirrors the branch
-/// order in `NotesApp.tsx` (`if (!session) return <AuthScreen/>`, `if
-/// (!onboarded) return <OnboardingScreen/>`). One deliberate simplification:
+/// order in `NotesApp.tsx` (renders `AuthScreen` when there's no session,
+/// `OnboardingScreen` when there's a session but onboarding isn't done).
+/// One deliberate simplification:
 /// the source also has a `loading` branch while its session check makes a
 /// network round-trip — there's no backend here to await (session state is
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/notes/search` and `/you` still render
+/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
 /// [PlaceholderScreen] until their real screens are built.
 
 final class AppRouterProvider
@@ -46,14 +48,15 @@ final class AppRouterProvider
   /// `docs/feature-audit.md` §1, per `docs/flutter-architecture.md` §3.
   ///
   /// The `/auth` → `/onboarding` → shell redirect guard mirrors the branch
-  /// order in `NotesApp.tsx` (`if (!session) return <AuthScreen/>`, `if
-  /// (!onboarded) return <OnboardingScreen/>`). One deliberate simplification:
+  /// order in `NotesApp.tsx` (renders `AuthScreen` when there's no session,
+  /// `OnboardingScreen` when there's a session but onboarding isn't done).
+  /// One deliberate simplification:
   /// the source also has a `loading` branch while its session check makes a
   /// network round-trip — there's no backend here to await (session state is
   /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
   /// instruction), so that branch has nothing to wait for and is skipped.
   ///
-  /// **Scaffold-stage placeholder:** `/notes/search` and `/you` still render
+  /// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
   /// [PlaceholderScreen] until their real screens are built.
   AppRouterProvider._()
     : super(
@@ -88,4 +91,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'8bd3332d669f076f45bae74e35e22a5711709ffb';
+String _$appRouterHash() => r'3db24b5ccd7f5ace957e3284891e761e04410b7a';

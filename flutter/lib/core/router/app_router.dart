@@ -9,6 +9,7 @@ import 'package:notes_app/features/notebooks/presentation/notebooks_screen.dart'
 import 'package:notes_app/features/notes/presentation/note_detail_screen.dart';
 import 'package:notes_app/features/notes/presentation/note_editor_screen.dart';
 import 'package:notes_app/features/notes/presentation/notes_list_screen.dart';
+import 'package:notes_app/features/notes/presentation/search_overlay_screen.dart';
 import 'package:notes_app/features/plan/presentation/plan_screen.dart';
 import 'package:notes_app/shell/app_shell.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -42,7 +43,7 @@ class _RouterRefreshNotifier extends ChangeNotifier {
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/notes/search` and `/you` still render
+/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
 /// [PlaceholderScreen] until their real screens are built.
 @riverpod
 GoRouter appRouter(Ref ref) {
@@ -90,8 +91,7 @@ GoRouter appRouter(Ref ref) {
                 routes: [
                   GoRoute(
                     path: 'search',
-                    builder: (context, state) =>
-                        const PlaceholderScreen(title: 'Search'),
+                    builder: (context, state) => const SearchOverlayScreen(),
                   ),
                   GoRoute(
                     path: ':id',

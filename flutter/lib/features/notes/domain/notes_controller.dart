@@ -293,6 +293,20 @@ class NoteNotebookFilter extends _$NoteNotebookFilter {
   void set(String? value) => state = value;
 }
 
+/// `board.search` — shared between the main notes list and the search
+/// overlay (`search_overlay_screen.dart`), matching the source: typing in
+/// the search field live-filters [visibleNoteListProvider] too, not just
+/// the overlay's own match list.
+@riverpod
+class NoteSearchQuery extends _$NoteSearchQuery {
+  @override
+  String build() => '';
+
+  // See theme_controller.dart's `setSkin` for why this stays a method.
+  // ignore: use_setters_to_change_properties
+  void set(String value) => state = value;
+}
+
 /// `AccountPanel`'s board-layout toggle. In-memory only for now — the
 /// source persists this via `lib/theme.ts`'s `LAYOUT_KEY`; that lands once
 /// `Prefs` is wired up.
@@ -316,11 +330,26 @@ List<Note> visibleNoteList(Ref ref) {
   final notes = ref.watch(notesControllerProvider);
   return visibleNotes(
     notes: notes,
+    search: ref.watch(noteSearchQueryProvider),
     sortKey: ref.watch(noteSortKeyProvider),
     filterKey: ref.watch(noteFilterKeyProvider),
     label: ref.watch(noteLabelFilterProvider),
     color: ref.watch(noteColorFilterProvider),
     notebookId: ref.watch(noteNotebookFilterProvider),
+  );
+}
+
+/// `searchHits` in `NotesApp.tsx` — always `all`/no-notebook, unlike
+/// [visibleNoteListProvider], but still respects the current label/color
+/// filter, matching the source exactly.
+@riverpod
+List<Note> searchHits(Ref ref) {
+  final notes = ref.watch(notesControllerProvider);
+  return visibleNotes(
+    notes: notes,
+    search: ref.watch(noteSearchQueryProvider),
+    label: ref.watch(noteLabelFilterProvider),
+    color: ref.watch(noteColorFilterProvider),
   );
 }
 
@@ -334,14 +363,14 @@ dash.NoteDashboard noteDashboardData(Ref ref) {
 }
 
 /// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
-/// has no active filter of any kind. `search` isn't modeled yet (no
-/// search screen), so it's left out of this gate until one exists.
+/// has no active filter of any kind, search included.
 @riverpod
 bool showTodayDashboard(Ref ref) =>
     ref.watch(noteFilterKeyProvider) == NoteFilter.all &&
     ref.watch(noteNotebookFilterProvider) == null &&
     ref.watch(noteLabelFilterProvider) == null &&
-    ref.watch(noteColorFilterProvider) == null;
+    ref.watch(noteColorFilterProvider) == null &&
+    ref.watch(noteSearchQueryProvider).trim().isEmpty;
 
 /// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
 /// counts keyed by `notebookId`, feeding both the Today dashboard's tiles

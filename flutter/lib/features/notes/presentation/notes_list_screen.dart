@@ -147,9 +147,7 @@ class const _HeaderRow() extends ConsumerWidget {
           ),
           PaperIconButton(
             label: 'Search notes',
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Search — not built yet')),
-            ),
+            onPressed: () => context.push('/notes/search'),
             child: const Icon(Icons.search, size: 18),
           ),
         ],

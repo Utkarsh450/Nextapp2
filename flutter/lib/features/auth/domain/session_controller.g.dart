@@ -80,7 +80,7 @@ final class SessionControllerProvider
   }
 }
 
-String _$sessionControllerHash() => r'a6098273516d52d2203f9448a7e9119361badb26';
+String _$sessionControllerHash() => r'aad80fb0a212516eb8e14eac86a6fed84770f902';
 
 /// Direct port of `hooks/useSession.ts`'s `sendOtp`/`verifyOtp`/`logout`,
 /// minus the network calls — there's no Apps Script backend in this build
