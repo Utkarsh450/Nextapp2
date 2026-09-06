@@ -50,16 +50,18 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Satoshi is self-hosted in the source app but only as .woff2, which
-  # Flutter can't load — see the "Known blocker" note in
-  # lib/core/theme/app_text_theme.dart. Once .otf/.ttf files are available
-  # under assets/fonts/, register them here:
-  # fonts:
-  #   - family: Satoshi
-  #     fonts:
-  #       - asset: assets/fonts/Satoshi-400.otf
-  #         weight: 400
-  #       - asset: assets/fonts/Satoshi-500.otf
-  #         weight: 500
-  #       - asset: assets/fonts/Satoshi-700.otf
-  #         weight: 700
+  # Satoshi is self-hosted in the source app only as .woff2, which Flutter
+  # can't load directly — these .ttf files are decompressed from those same
+  # .woff2s (via `fonttools ttLib.woff2 decompress`), same license, same
+  # glyphs, just an OS-loadable container.
+  fonts:
+    - family: Satoshi
+      fonts:
+        - asset: assets/fonts/Satoshi-400.ttf
+          weight: 400
+        - asset: assets/fonts/Satoshi-500.ttf
+          weight: 500
+        - asset: assets/fonts/Satoshi-700.ttf
+          weight: 700
+        - asset: assets/fonts/Satoshi-900.ttf
+          weight: 900

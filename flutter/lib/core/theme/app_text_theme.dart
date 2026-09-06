@@ -2,15 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:notes_app/core/theme/tokens/app_text_styles.dart';
 
-/// Font family from `docs/design-system.md` §2. Satoshi is self-hosted in
-/// the source app as static WOFF2 files, which Flutter cannot load — the
-/// repo only has `.woff2` today (`app/fonts/Satoshi-*.woff2`).
-///
-/// Known blocker: obtain the Satoshi `.otf`/`.ttf` files (same free
-/// Fontshare license) and register them under a `fonts:` block in
-/// pubspec.yaml pointing at `assets/fonts/`. Until then this family name
-/// resolves through the fallback stack below to the platform default, so
-/// nothing breaks — but the real face isn't showing yet.
+/// Font family from `docs/design-system.md` §2. The source self-hosts
+/// Satoshi only as `.woff2` (`app/fonts/Satoshi-*.woff2`), which Flutter
+/// can't load directly — `assets/fonts/Satoshi-*.ttf` are the same files
+/// decompressed to a container Flutter can (`fonttools ttLib.woff2
+/// decompress`), registered in `pubspec.yaml`'s `fonts:` block.
 const String _fontFamily = 'Satoshi';
 
 /// `Arial, Helvetica, sans-serif` — the source's own fallback stack.
@@ -55,8 +51,7 @@ TextTheme buildAppTextTheme(Color ink) {
       fontSize: size,
       fontWeight: weight,
       height: height,
-      letterSpacing:
-          letterSpacingEm == null ? null : letterSpacingEm * size,
+      letterSpacing: letterSpacingEm == null ? null : letterSpacingEm * size,
     );
   }
 

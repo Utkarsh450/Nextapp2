@@ -347,13 +347,22 @@ class const _NotesEmptyState({required final NoteFilter filterKey})
 
 class const _NotesResultsSliver({required final List<Note> shown})
     extends ConsumerWidget {
+  /// `.notes-grid`'s `column-gap`/`.note-card`'s `margin-bottom` in
+  /// `app/globals.css` — both `0.95rem`. This is a real, previously-missed
+  /// gap: it isn't part of the app's 4px spacing scale
+  /// (`docs/design-system.md` §3), so the grid was using `AppSpacing.sm`
+  /// (8px) as a stand-in — nearly half the source's actual card spacing,
+  /// which read as visibly more cramped than intended.
+  static const double _cardGap = 15.2;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final spacing = Theme.of(context).extension<AppSpacing>()!;
     final layout = ref.watch(noteBoardLayoutControllerProvider);
     final controller = ref.read(notesControllerProvider.notifier);
-    final padding = EdgeInsets.symmetric(horizontal: spacing.lg)
-        .copyWith(bottom: spacing.xxl);
+    // `NotesGrid.tsx`'s `px-3.5` (14px), not the generic `AppSpacing.lg`
+    // (16px) — close, but this screen's horizontal padding has its own
+    // source-specified value.
+    const padding = EdgeInsets.fromLTRB(14, 0, 14, 24);
 
     Widget buildCard(BuildContext context, int index) {
       final note = shown[index];
@@ -381,15 +390,15 @@ class const _NotesResultsSliver({required final List<Note> shown})
       sliver: layout == NoteBoardLayout.masonry
           ? SliverMasonryGrid.count(
               crossAxisCount: 2,
-              mainAxisSpacing: spacing.sm,
-              crossAxisSpacing: spacing.sm,
+              mainAxisSpacing: _cardGap,
+              crossAxisSpacing: _cardGap,
               childCount: shown.length,
               itemBuilder: buildCard,
             )
           : SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) => index.isOdd
-                    ? SizedBox(height: spacing.sm)
+                    ? const SizedBox(height: _cardGap)
                     : buildCard(context, index ~/ 2),
                 childCount: shown.isEmpty ? 0 : shown.length * 2 - 1,
               ),
