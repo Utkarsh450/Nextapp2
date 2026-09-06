@@ -322,6 +322,20 @@ bool showTodayDashboard(Ref ref) =>
     ref.watch(noteLabelFilterProvider) == null &&
     ref.watch(noteColorFilterProvider) == null;
 
+/// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
+/// counts keyed by `notebookId`, feeding both the Today dashboard's tiles
+/// and the Notebooks library (feature-audit #11).
+@riverpod
+Map<String, int> liveNotebookCounts(Ref ref) {
+  final notes = ref.watch(notesControllerProvider);
+  final counts = <String, int>{};
+  for (final note in notes) {
+    if (note.trashedAt != null || note.archived) continue;
+    counts[note.notebookId] = (counts[note.notebookId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 @riverpod
 List<String> noteLabelOptions(Ref ref) =>
     uniqueLabels(ref.watch(notesControllerProvider));

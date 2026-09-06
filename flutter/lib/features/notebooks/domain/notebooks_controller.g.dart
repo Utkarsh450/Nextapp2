@@ -63,7 +63,7 @@ final class NotebooksControllerProvider
 }
 
 String _$notebooksControllerHash() =>
-    r'3edca57c8fc8b95d5320a5db3a9a0d6b3c073d48';
+    r'f033106aeb4457451c60c2c55de41f8da597f30d';
 
 /// **In-memory only**, matching every other controller in this build (no
 /// Drift wiring yet). The source always loads this array from the account

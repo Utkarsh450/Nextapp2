@@ -600,6 +600,64 @@ final class ShowTodayDashboardProvider
 String _$showTodayDashboardHash() =>
     r'26d84f694b46f3ace1e78866262a0d644aa016a9';
 
+/// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
+/// counts keyed by `notebookId`, feeding both the Today dashboard's tiles
+/// and the Notebooks library (feature-audit #11).
+
+@ProviderFor(liveNotebookCounts)
+final liveNotebookCountsProvider = LiveNotebookCountsProvider._();
+
+/// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
+/// counts keyed by `notebookId`, feeding both the Today dashboard's tiles
+/// and the Notebooks library (feature-audit #11).
+
+final class LiveNotebookCountsProvider
+    extends
+        $FunctionalProvider<
+          Map<String, int>,
+          Map<String, int>,
+          Map<String, int>
+        >
+    with $Provider<Map<String, int>> {
+  /// `notebookCounts` in `NotesApp.tsx` — live (not archived/trashed) note
+  /// counts keyed by `notebookId`, feeding both the Today dashboard's tiles
+  /// and the Notebooks library (feature-audit #11).
+  LiveNotebookCountsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'liveNotebookCountsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$liveNotebookCountsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, int>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Map<String, int> create(Ref ref) {
+    return liveNotebookCounts(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, int> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, int>>(value),
+    );
+  }
+}
+
+String _$liveNotebookCountsHash() =>
+    r'472bf4fe89afddee9c423d03af8c02b430719512';
+
 @ProviderFor(noteLabelOptions)
 final noteLabelOptionsProvider = NoteLabelOptionsProvider._();
 
