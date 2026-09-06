@@ -350,10 +350,7 @@ class const _NotesResultsSliver({required final List<Note> shown})
         key: ValueKey(note.id),
         note: note,
         index: index,
-        // NoteDetail (read-only view, feature-audit #7) isn't built yet —
-        // open straight into the editor so tapping a card isn't a dead
-        // end. See note_editor_screen.dart's doc comment.
-        onOpen: () => context.push('/notes/${note.id}/edit'),
+        onOpen: () => context.push('/notes/${note.id}'),
         onToggleTask: (line) => controller.toggleTask(note.id, line),
         onToggleDone: () => controller.toggleDone(note.id),
         onPin: () => controller.togglePin(note.id),

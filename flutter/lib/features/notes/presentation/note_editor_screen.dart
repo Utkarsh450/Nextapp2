@@ -41,10 +41,16 @@ import 'package:speech_to_text/speech_to_text.dart';
 /// - Export shares the note as Markdown *text* via the share sheet
 ///   (`share_plus`), not a written `.md` file — simpler, and the user can
 ///   still save it from there.
-/// - Pin/Archive/Duplicate/Mark-done/Trash are surfaced here (as an
-///   overflow menu) even though the source's editor header only has
-///   Close/Done — `NoteDetail`, the screen that normally hosts these, isn't
-///   built yet, so leaving them out would make an opened note a dead end.
+/// - Mark-done (the [PaytmTick] in the app bar) is the one gesture kept
+///   here beyond the source's bare Close/Done header — decided in
+///   `docs/feature-audit.md` as a real, wired-up gesture in Flutter (the
+///   source built `confirmed` at the data layer but never shipped a UI
+///   for it). Pin/Archive/Duplicate/Trash used to live here too, as a
+///   stand-in overflow menu for when `NoteDetail` (the screen that
+///   actually hosts Delete/Restore in the source) didn't exist yet; now
+///   that it does — and `NoteCard`'s own long-press menu already covers
+///   Pin/Archive/Duplicate — that overflow menu is gone, matching the
+///   source's header exactly.
 class const NoteEditorScreen({required final int noteId, super.key})
     extends ConsumerStatefulWidget {
   @override
@@ -74,8 +80,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     super.dispose();
   }
 
-  NotesController get _controller =>
-      ref.read(notesControllerProvider.notifier);
+  NotesController get _controller => ref.read(notesControllerProvider.notifier);
 
   /// Resets local editor UI (and re-seeds the text controllers) only when
   /// switching to a different note — matches the source's
@@ -147,15 +152,14 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   void _showVoiceMissing() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Voice is not available')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Voice is not available')));
   }
 
   void _openLink(Note note, List<Note> allNotes, String title) {
     final match = findNoteByTitle(allNotes, title);
     if (match != null) {
-      unawaited(context.push('/notes/${match.id}/edit'));
+      unawaited(context.push('/notes/${match.id}'));
     } else {
       // `onCreateLinked` — link forward from here, then jump into a new,
       // already-titled note for it.
@@ -183,21 +187,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  void _handleMenuAction(BuildContext context, Note note, String action) {
-    switch (action) {
-      case 'pin':
-        _controller.togglePin(note.id);
-      case 'archive':
-        _controller.toggleArchive(note.id);
-      case 'duplicate':
-        final copy = _controller.duplicateNote(note.id);
-        if (copy != null) context.pushReplacement('/notes/${copy.id}/edit');
-      case 'trash':
-        _controller.moveToTrash(note.id);
-        context.pop();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final note = ref.watch(noteByIdProvider(widget.noteId));
@@ -216,8 +205,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final paperColor = swatches.resolveHex(
       note.color.isEmpty ? NoteSwatches.paletteHex[0] : note.color,
     );
-    final ink = ThemeData.estimateBrightnessForColor(paperColor) ==
-            Brightness.dark
+    final ink =
+        ThemeData.estimateBrightnessForColor(paperColor) == Brightness.dark
         ? Colors.white
         : const Color(0xFF2B261F);
 
@@ -241,24 +230,6 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           PaytmTick(
             active: note.confirmed,
             onToggle: () => _controller.toggleDone(note.id),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (action) => _handleMenuAction(context, note, action),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'pin',
-                child: Text(note.pinned ? 'Unpin' : 'Pin'),
-              ),
-              PopupMenuItem(
-                value: 'archive',
-                child: Text(note.archived ? 'Unarchive' : 'Archive'),
-              ),
-              const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
-              const PopupMenuItem(
-                value: 'trash',
-                child: Text('Move to trash'),
-              ),
-            ],
           ),
           TextButton(
             onPressed: () => context.pop(),
@@ -308,8 +279,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 _ToolChip(
                   icon: Icons.checklist,
                   label: 'Checklist',
-                  onTap: () =>
-                      _updateBody(note, insertChecklist(note.body)),
+                  onTap: () => _updateBody(note, insertChecklist(note.body)),
                 ),
                 _ToolChip(
                   icon: Icons.add_photo_alternate_outlined,
@@ -584,7 +554,7 @@ class const _BacklinksPanel({
               for (final item in incoming)
                 ActionChip(
                   label: Text(item.title.isEmpty ? 'Untitled' : item.title),
-                  onPressed: () => context.push('/notes/${item.id}/edit'),
+                  onPressed: () => context.push('/notes/${item.id}'),
                 ),
             ],
           ),

@@ -130,7 +130,7 @@ class const _ProgressCard({
         borderRadius: radius,
         onTap: () {
           if (featured != null) {
-            unawaited(context.push('/notes/${featured.id}/edit'));
+            unawaited(context.push('/notes/${featured.id}'));
           } else {
             ref.read(noteFilterKeyProvider.notifier).set(NoteFilter.open);
           }
@@ -374,7 +374,7 @@ class const _DueRow({required final Note note}) extends StatelessWidget {
       borderRadius: radius,
       child: InkWell(
         borderRadius: radius,
-        onTap: () => unawaited(context.push('/notes/${note.id}/edit')),
+        onTap: () => unawaited(context.push('/notes/${note.id}')),
         child: Container(
           constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 14),

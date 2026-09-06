@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:notes_app/core/widgets/placeholder_screen.dart';
 import 'package:notes_app/features/notebooks/presentation/notebooks_screen.dart';
+import 'package:notes_app/features/notes/presentation/note_detail_screen.dart';
 import 'package:notes_app/features/notes/presentation/note_editor_screen.dart';
 import 'package:notes_app/features/notes/presentation/notes_list_screen.dart';
 import 'package:notes_app/features/plan/presentation/plan_screen.dart';
@@ -13,12 +14,9 @@ part 'app_router.g.dart';
 /// `docs/feature-audit.md` §1, per `docs/flutter-architecture.md` §3.
 ///
 /// **Scaffold-stage placeholder:** every branch except `/notes`,
-/// `/notes/:id/edit`, `/notebooks`, and `/plan` still renders
-/// [PlaceholderScreen] until its real screen is built — `/notes/:id` (the
-/// read-only `NoteDetail`
-/// view) is still a placeholder, so note cards open straight into the
-/// editor for now; see `note_editor_screen.dart`'s doc comment. The
-/// `/auth` → `/onboarding` → shell
+/// `/notes/:id`, `/notes/:id/edit`, `/notebooks`, and `/plan` still renders
+/// [PlaceholderScreen] until its real screen is built. The `/auth` →
+/// `/onboarding` → shell
 /// redirect guard (session-null / not-onboarded, mirroring the branch order
 /// in `NotesApp.tsx`) is **not yet wired** — it depends on the real
 /// `SessionNotifier`, which is built alongside the auth screen. Per the
@@ -59,8 +57,8 @@ final GoRouter _router = GoRouter(
                 ),
                 GoRoute(
                   path: ':id',
-                  builder: (context, state) => PlaceholderScreen(
-                    title: 'Note ${state.pathParameters['id']}',
+                  builder: (context, state) => NoteDetailScreen(
+                    noteId: int.parse(state.pathParameters['id']!),
                   ),
                   routes: [
                     GoRoute(
