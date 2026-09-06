@@ -5,6 +5,13 @@
     <!-- flutter_local_notifications ("Phone alerts" row, Account screen,
          Android 13+ requires this to be requested at runtime). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Real reminder delivery (core/services/notification_service.dart)
+         schedules exact-time alarms for a note's due date/alert lead time,
+         matching the source's own "exact alarms" via Capacitor. Android
+         12+ treats this as a special permission — granted via a system
+         Settings screen (`requestExactAlarmsPermission()`), not an in-app
+         dialog. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <application
         android:label="notes_app"
         android:name="${applicationName}"

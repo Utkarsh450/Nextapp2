@@ -1,9 +1,7 @@
-/// Direct port of the reminder logic in `lib/notes/reminders.ts`.
-///
-/// Notification *scheduling* itself is out of scope for this build — these
-/// functions only compute and validate the fields; wiring `remindAt` to an
-/// actual OS notification is separate `notification_service` work per
-/// `docs/flutter-architecture.md` §5, not done here.
+/// Direct port of the reminder logic in `lib/notes/reminders.ts`. Field
+/// computation/validation lives here; actual scheduling against the OS is
+/// `core/services/notification_service.dart` (`docs/flutter-architecture.md`
+/// §5), wired up in `notes_controller.dart`.
 library;
 
 import 'package:notes_app/features/notes/domain/note_dates.dart';
@@ -102,8 +100,9 @@ ReminderFields resolveReminderFields({
     );
   }
   final resolvedDueTime = timeOnly(dueTime);
-  final resolvedAlert =
-      alertMinutes != null && _isAlertMinutes(alertMinutes) ? alertMinutes : 0;
+  final resolvedAlert = alertMinutes != null && _isAlertMinutes(alertMinutes)
+      ? alertMinutes
+      : 0;
   // Matches the source passing a literal `0` here: this stores whatever
   // remindAt the fields resolve to, even if it's already in the past —
   // the "is it still upcoming" check belongs to the (not yet built)
@@ -170,4 +169,22 @@ String? formatDueChip(String? dueAt, [String? dueTime, String? today]) {
   final parts = date.split('-').map(int.parse).toList();
   final pretty = '${_monthNames[parts[1] - 1]} ${parts[2]}';
   return clock != null ? '$pretty · $clock' : pretty;
+}
+
+/// The notification body text — matches `reminderBody`. `formatDueChip`
+/// here always gets its "pretty date" form (no `today` passed), same as
+/// the source's own call site.
+String reminderBody(
+  String title,
+  String? dueAt,
+  String? dueTime,
+  String preview,
+) {
+  final when = formatDueChip(dueAt, dueTime);
+  final trimmed = preview.trim();
+  final snippet = trimmed.substring(0, trimmed.length.clamp(0, 80));
+  final tail = snippet.isNotEmpty
+      ? snippet
+      : (title.isNotEmpty ? title : 'You have a note due.');
+  return [?when, tail].join(' · ');
 }

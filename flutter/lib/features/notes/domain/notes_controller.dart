@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:notes_app/core/services/notification_service.dart';
 import 'package:notes_app/core/theme/tokens/note_swatches.dart';
 import 'package:notes_app/features/notebooks/domain/notebooks_controller.dart';
 import 'package:notes_app/features/notes/domain/note.dart';
@@ -17,19 +19,58 @@ part 'notes_controller.g.dart';
 /// Holds the notes list itself.
 ///
 /// **In-memory only, per instruction:** no Drift wiring yet, so state
-/// resets to [sampleNotes] on every app restart. Mirrors the action set of
-/// `hooks/useNotes.ts` for the actions this screen needs; note creation and
-/// editing arrive with the note editor screen.
+/// resets to [sampleNotes] on every app restart (which also means every
+/// restart resyncs reminders against that fresh seed — see [build]).
+/// Mirrors the action set of `hooks/useNotes.ts` for the actions this
+/// screen needs; note creation and editing arrive with the note editor
+/// screen. Reminder scheduling (`_queueReminder`) is real, working
+/// `core/services/notification_service.dart` integration, not a stub.
 @riverpod
 class NotesController extends _$NotesController {
   @override
-  List<Note> build() => sampleNotes();
+  List<Note> build() {
+    // `owned.forEach(queueReminder)` on load — resyncs every live note's
+    // reminder against the OS on every app (re)start, matching
+    // `hooks/useNotes.ts`'s effect that runs once notes finish loading.
+    return sampleNotes()..forEach(_queueReminder);
+  }
 
-  void _patch(int id, Note Function(Note note) update) {
+  /// Matches `queueReminder` — schedules (or cancels, if there's nothing
+  /// to fire) a note's reminder against the real OS notification service.
+  /// Fire-and-forget, same as the source's own `void scheduleNoteReminder`/
+  /// `void cancelNoteReminder` calls.
+  void _queueReminder(Note note) {
+    if (note.trashedAt != null || note.archived) {
+      unawaited(NotificationService.instance.cancelNoteReminder(note.id));
+      return;
+    }
+    final at = reminderFireDate(note.dueAt, note.dueTime, note.alertMinutes);
+    if (at == null) {
+      unawaited(NotificationService.instance.cancelNoteReminder(note.id));
+      return;
+    }
+    unawaited(
+      NotificationService.instance.scheduleNoteReminder(
+        noteId: note.id,
+        title: note.title,
+        body: reminderBody(
+          note.title,
+          note.dueAt,
+          note.dueTime,
+          note.preview.isNotEmpty ? note.preview : note.body,
+        ),
+        at: at,
+      ),
+    );
+  }
+
+  Note? _patch(int id, Note Function(Note note) update) {
+    Note? patched;
     state = [
       for (final note in state)
-        if (note.id == id) update(note) else note,
+        if (note.id == id) (patched = update(note)) else note,
     ];
+    return patched;
   }
 
   /// `togglePin` — flips `pinned`.
@@ -39,13 +80,16 @@ class NotesController extends _$NotesController {
   }
 
   /// `toggleArchive` — flips `archived`, and unpins (matching the source:
-  /// an archived note is never shown pinned).
+  /// an archived note is never shown pinned). Archiving cancels the note's
+  /// reminder; unarchiving reschedules it, matching `queueReminder` at this
+  /// same call site in `hooks/useNotes.ts`.
   void toggleArchive(int id) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    _patch(
+    final patched = _patch(
       id,
       (n) => n.copyWith(archived: !n.archived, pinned: false, updatedAt: now),
     );
+    if (patched != null) _queueReminder(patched);
   }
 
   /// `toggleDone` — flips `confirmed`. Decided in `docs/feature-audit.md`
@@ -65,34 +109,49 @@ class NotesController extends _$NotesController {
     );
   }
 
-  /// `moveToTrash`.
+  /// `moveToTrash` — cancels the note's reminder directly (matching the
+  /// source's own direct `cancelNoteReminder` call here, rather than going
+  /// through `queueReminder`).
   void moveToTrash(int id) {
     final now = DateTime.now().millisecondsSinceEpoch;
     state = [
       for (final note in state)
         if (note.id == id) trashNote(note, now) else note,
     ];
+    unawaited(NotificationService.instance.cancelNoteReminder(id));
   }
 
-  /// `restoreTrashed`.
+  /// `restoreTrashed` — reschedules the note's reminder, matching
+  /// `queueReminder` at this call site.
   void restoreTrashed(int id) {
     final now = DateTime.now().millisecondsSinceEpoch;
+    Note? restored;
     state = [
       for (final note in state)
-        if (note.id == id) restoreFromTrash(note, now) else note,
+        if (note.id == id) (restored = restoreFromTrash(note, now)) else note,
     ];
+    if (restored != null) _queueReminder(restored);
   }
 
-  /// `deleteForever`.
+  /// `deleteForever` — cancels the note's reminder directly.
   void deleteForever(int id) {
     state = [
       for (final note in state)
         if (note.id != id) note,
     ];
+    unawaited(NotificationService.instance.cancelNoteReminder(id));
   }
 
-  /// `emptyTrash`.
+  /// `emptyTrash` — cancels every trashed note's reminder before dropping
+  /// them (most won't have one live, since `moveToTrash` already cancelled
+  /// it, but a note trashed in a previous session before this build's
+  /// scheduling existed could still have one outstanding).
   void emptyTrash() {
+    for (final note in state) {
+      if (note.trashedAt != null) {
+        unawaited(NotificationService.instance.cancelNoteReminder(note.id));
+      }
+    }
     state = [
       for (final note in state)
         if (note.trashedAt == null) note,
@@ -154,6 +213,7 @@ class NotesController extends _$NotesController {
               if (n.id == stamped.id) stamped else n,
           ]
         : [stamped, ...state];
+    _queueReminder(stamped);
     return stamped;
   }
 
