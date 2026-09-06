@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:notes_app/core/utils/data_uri_cache.dart';
 import 'package:notes_app/features/notes/domain/note_backlinks.dart';
 import 'package:notes_app/features/notes/domain/note_markdown.dart';
 
@@ -42,20 +41,18 @@ class const MarkdownPreviewView({
     return switch (block) {
       HeadingBlock(:final level, :final text) => Text(
         text,
-        style: (level == 1
-                ? theme.textTheme.titleLarge
-                : level == 2
-                ? theme.textTheme.titleMedium
-                : theme.textTheme.bodyLarge)
-            ?.copyWith(fontWeight: FontWeight.w600),
+        style:
+            (level == 1
+                    ? theme.textTheme.titleLarge
+                    : level == 2
+                    ? theme.textTheme.titleMedium
+                    : theme.textTheme.bodyLarge)
+                ?.copyWith(fontWeight: FontWeight.w600),
       ),
       TaskBlock(:final checked, :final text, :final line) => Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Checkbox(
-            value: checked,
-            onChanged: (_) => onToggleTask(line),
-          ),
+          Checkbox(value: checked, onChanged: (_) => onToggleTask(line)),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -74,11 +71,13 @@ class const MarkdownPreviewView({
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('• '),
-            Expanded(child: _LinkedText(text: text, onOpenLink: onOpenLink)),
+            Expanded(
+              child: _LinkedText(text: text, onOpenLink: onOpenLink),
+            ),
           ],
         ),
       ),
-      ImageBlock(:final src, :final alt) => _buildImage(src, alt),
+      ImageBlock(:final src, :final alt) => _buildImage(context, src, alt),
       ParagraphBlock(:final text) => _LinkedText(
         text: text,
         onOpenLink: onOpenLink,
@@ -86,11 +85,17 @@ class const MarkdownPreviewView({
     };
   }
 
-  Widget _buildImage(String src, String alt) {
-    final match = RegExp(r'^data:[^;]+;base64,(.+)$').firstMatch(src);
-    if (match == null) return const SizedBox.shrink();
+  Widget _buildImage(BuildContext context, String src, String alt) {
+    if (!RegExp(r'^data:[^;]+;base64,.+$').hasMatch(src)) {
+      return const SizedBox.shrink();
+    }
     try {
-      final bytes = base64Decode(match.group(1)!);
+      final bytes = decodeDataUriBytes(src);
+      // Bounds the codec's decode target to what's actually displayed
+      // (192 logical px tall) instead of decoding a phone photo at its
+      // full native resolution just to shrink it back down when painted —
+      // a real memory/CPU cost for anything camera-sized.
+      final dpr = MediaQuery.devicePixelRatioOf(context);
       return ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Image.memory(
@@ -98,6 +103,7 @@ class const MarkdownPreviewView({
           semanticLabel: alt,
           height: 192,
           fit: BoxFit.cover,
+          cacheHeight: (192 * dpr).round(),
         ),
       );
     } on FormatException {

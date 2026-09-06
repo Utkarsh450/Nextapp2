@@ -7,10 +7,8 @@ library;
 /// One parsed line of a note's body.
 sealed class const MarkdownBlock();
 
-class const HeadingBlock({
-  required final int level,
-  required final String text,
-}) extends MarkdownBlock;
+class const HeadingBlock({required final int level, required final String text})
+    extends MarkdownBlock;
 
 class const TaskBlock({
   required final bool checked,
@@ -23,8 +21,7 @@ class const ListBlock({required final String text}) extends MarkdownBlock;
 class const ImageBlock({required final String src, required final String alt})
     extends MarkdownBlock;
 
-class const ParagraphBlock({required final String text})
-    extends MarkdownBlock;
+class const ParagraphBlock({required final String text}) extends MarkdownBlock;
 
 final RegExp _headingRe = RegExp(r'^(#{1,3})\s+(.*)$');
 final RegExp _imageRe = RegExp(r'^!\[([^\]]*)\]\((.+)\)$');
@@ -156,7 +153,25 @@ class const NoteCardSurface({
   required final String prose,
 });
 
+/// Bounded LRU memoization for [cardSurface] — every visible `NoteCard`
+/// calls this on every rebuild of the notes grid (any note anywhere
+/// changing invalidates the whole list, since `visibleNoteListProvider`
+/// hands back a fresh `List` each time), which otherwise means re-running
+/// several regex passes over a note's full body just to re-render cards
+/// whose own content hasn't changed at all. Capped so a long session full
+/// of distinct edited bodies can't grow this unboundedly. Keyed by a
+/// record (not a concatenated string) so two different (body,
+/// fallbackPreview) pairs can never collide onto the same cache entry.
+const _cardSurfaceCacheLimit = 64;
+final Map<(String, String), NoteCardSurface> _cardSurfaceCache = {};
+
 NoteCardSurface cardSurface(String body, [String fallbackPreview = '']) {
+  final key = (body, fallbackPreview);
+  final cached = _cardSurfaceCache.remove(key);
+  if (cached != null) {
+    _cardSurfaceCache[key] = cached; // Re-insert at the end (most-recent).
+    return cached;
+  }
   final normalized = body.replaceAll(RegExp(r'^•\s+', multiLine: true), '- ');
   final blocks = parseMarkdown(normalized);
   final tasks = blocks.whereType<TaskBlock>().toList();
@@ -166,9 +181,14 @@ NoteCardSurface cardSurface(String body, [String fallbackPreview = '']) {
       .replaceAll(RegExp(r'^\s*-\s+.+$', multiLine: true), '')
       .replaceAll(RegExp(r'\n{3,}'), '\n\n')
       .trim();
-  return NoteCardSurface(
+  final result = NoteCardSurface(
     shownTasks: tasks.take(6).toList(),
     shownBullets: bullets.take(6).toList(),
     prose: prose,
   );
+  _cardSurfaceCache[key] = result;
+  if (_cardSurfaceCache.length > _cardSurfaceCacheLimit) {
+    _cardSurfaceCache.remove(_cardSurfaceCache.keys.first);
+  }
+  return result;
 }

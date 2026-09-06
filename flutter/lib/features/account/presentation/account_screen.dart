@@ -11,6 +11,7 @@ import 'package:notes_app/core/theme/paper_palette.dart';
 import 'package:notes_app/core/theme/paper_skin.dart';
 import 'package:notes_app/core/theme/theme_controller.dart';
 import 'package:notes_app/core/theme/theme_mode_controller.dart';
+import 'package:notes_app/core/utils/data_uri_cache.dart';
 import 'package:notes_app/features/account/domain/note_export.dart';
 import 'package:notes_app/features/account/domain/phone_alerts_controller.dart';
 import 'package:notes_app/features/account/domain/profile_controller.dart';
@@ -531,10 +532,12 @@ class const _AvatarWithEdit({
             borderRadius: BorderRadius.circular(27.2),
             child: avatar != null
                 ? Image.memory(
-                    base64Decode(avatar.split(',').last),
+                    decodeDataUriBytes(avatar),
                     width: 89.6,
                     height: 89.6,
                     fit: BoxFit.cover,
+                    cacheWidth: (89.6 * MediaQuery.devicePixelRatioOf(context))
+                        .round(),
                   )
                 : Container(
                     width: 89.6,
