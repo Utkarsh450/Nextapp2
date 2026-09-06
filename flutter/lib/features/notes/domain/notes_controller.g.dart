@@ -59,7 +59,7 @@ final class NotesControllerProvider
   }
 }
 
-String _$notesControllerHash() => r'9e42b0852b58f919ed19434bb83393a29edbb2c1';
+String _$notesControllerHash() => r'9148a4723d11f0b4cd8dfbf668b24ecd70abd61a';
 
 /// Holds the notes list itself.
 ///

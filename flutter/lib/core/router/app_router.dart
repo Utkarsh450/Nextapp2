@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
-import 'package:notes_app/core/widgets/placeholder_screen.dart';
+import 'package:notes_app/features/account/presentation/account_screen.dart';
 import 'package:notes_app/features/auth/domain/onboarding_controller.dart';
 import 'package:notes_app/features/auth/domain/session_controller.dart';
 import 'package:notes_app/features/auth/presentation/auth_screen.dart';
 import 'package:notes_app/features/auth/presentation/onboarding_screen.dart';
+import 'package:notes_app/features/legal/presentation/privacy_screen.dart';
 import 'package:notes_app/features/notebooks/presentation/notebooks_screen.dart';
 import 'package:notes_app/features/notes/presentation/note_detail_screen.dart';
 import 'package:notes_app/features/notes/presentation/note_editor_screen.dart';
@@ -43,8 +44,9 @@ class _RouterRefreshNotifier extends ChangeNotifier {
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
-/// [PlaceholderScreen] until their real screens are built.
+/// Every route now renders its real screen — the last two
+/// (`/you`, `/privacy`) landed together with the Account/Settings and
+/// Privacy policy screens (feature-audit #14, #15).
 @riverpod
 GoRouter appRouter(Ref ref) {
   final refresh = _RouterRefreshNotifier(ref);
@@ -76,8 +78,7 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/privacy',
-        builder: (context, state) =>
-            const PlaceholderScreen(title: 'Privacy policy'),
+        builder: (context, state) => const PrivacyScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -131,8 +132,7 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: '/you',
-                builder: (context, state) =>
-                    const PlaceholderScreen(title: 'You'),
+                builder: (context, state) => const AccountScreen(),
               ),
             ],
           ),

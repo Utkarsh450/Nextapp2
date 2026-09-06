@@ -2,6 +2,9 @@
     <!-- speech_to_text (note editor's voice dictation, see
          lib/features/notes/presentation/note_editor_screen.dart). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- flutter_local_notifications ("Phone alerts" row, Account screen,
+         Android 13+ requires this to be requested at runtime). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="notes_app"
         android:name="${applicationName}"

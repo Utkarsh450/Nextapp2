@@ -231,6 +231,14 @@ class NotesController extends _$NotesController {
   void reorder(int fromId, int toId) {
     state = moveNote(state, fromId, toId);
   }
+
+  /// Appends a freshly-imported batch of notes (Account screen's "Import
+  /// backup" — `board.importBackup` in the source). The imported list
+  /// already carries the full, merged result (existing + new), matching
+  /// `importNotesJson`'s own return shape.
+  void replaceAll(List<Note> notes) {
+    state = notes;
+  }
 }
 
 /// `board.filterKey` — defaults to `all`, matching the source.

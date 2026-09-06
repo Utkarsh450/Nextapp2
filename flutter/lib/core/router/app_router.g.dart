@@ -20,8 +20,9 @@ part of 'app_router.dart';
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
-/// [PlaceholderScreen] until their real screens are built.
+/// Every route now renders its real screen — the last two
+/// (`/you`, `/privacy`) landed together with the Account/Settings and
+/// Privacy policy screens (feature-audit #14, #15).
 
 @ProviderFor(appRouter)
 final appRouterProvider = AppRouterProvider._();
@@ -38,8 +39,9 @@ final appRouterProvider = AppRouterProvider._();
 /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
 /// instruction), so that branch has nothing to wait for and is skipped.
 ///
-/// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
-/// [PlaceholderScreen] until their real screens are built.
+/// Every route now renders its real screen — the last two
+/// (`/you`, `/privacy`) landed together with the Account/Settings and
+/// Privacy policy screens (feature-audit #14, #15).
 
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
@@ -56,8 +58,9 @@ final class AppRouterProvider
   /// synchronous in-memory Riverpod state, per the "no backend/DB for now"
   /// instruction), so that branch has nothing to wait for and is skipped.
   ///
-  /// **Scaffold-stage placeholder:** `/you` and `/privacy` still render
-  /// [PlaceholderScreen] until their real screens are built.
+  /// Every route now renders its real screen — the last two
+  /// (`/you`, `/privacy`) landed together with the Account/Settings and
+  /// Privacy policy screens (feature-audit #14, #15).
   AppRouterProvider._()
     : super(
         from: null,
@@ -91,4 +94,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'3db24b5ccd7f5ace957e3284891e761e04410b7a';
+String _$appRouterHash() => r'0899671c0e9d06b21da40c3ef8ec35b0ef97ec61';
