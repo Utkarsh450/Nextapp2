@@ -13,14 +13,13 @@ import 'package:notes_app/features/notes/domain/note.dart';
 import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_labels.dart';
 import 'package:notes_app/features/notes/domain/notes_controller.dart';
-import 'package:notes_app/features/notes/presentation/create_sheet.dart';
 import 'package:notes_app/features/notes/presentation/note_card.dart';
 import 'package:notes_app/features/notes/presentation/today_dashboard.dart';
 
 /// Creates a blank note and jumps straight into its editor — used by the
 /// empty state's "Write your first note" action, matching the source's
-/// own direct-create `AddAction`s (as opposed to the FAB, which opens
-/// Quick capture — see `create_sheet.dart`'s doc comment).
+/// own direct-create `AddAction`s (as opposed to the dock's + button,
+/// which opens the "Add…" menu — see `shell/app_dock.dart`).
 void _createAndEdit(BuildContext context, WidgetRef ref) {
   final note = ref.read(notesControllerProvider.notifier).createBlank();
   unawaited(context.push('/notes/${note.id}/edit'));
@@ -50,11 +49,9 @@ class const NotesListScreen({super.key}) extends ConsumerWidget {
     final spacing = Theme.of(context).extension<AppSpacing>()!;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showCreateSheet(context),
-        tooltip: 'New note',
-        child: const Icon(Icons.add),
-      ),
+      // No FAB here — the dock's own + button (`app_dock.dart`) is the
+      // single entry point across every tab, matching the source (one
+      // dock-level + button, not a per-screen one).
       // A single CustomScrollView (rather than a fixed header Column with
       // only the grid scrolling underneath) matches the source's
       // whole-page scroll — and matters more than cosmetics here: once

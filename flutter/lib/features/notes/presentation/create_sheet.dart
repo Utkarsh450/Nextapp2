@@ -15,14 +15,10 @@ import 'package:speech_to_text/speech_to_text.dart';
 /// whatever note it creates — matching the source's own
 /// `onCreate` → `editNote(note.id)` flow.
 ///
-/// **Reached from:** the Notes tab's FAB. In the source, a *short* tap on
-/// the dock's "+" opens a separate seven-item "Add…" radial menu (Note/
-/// Checklist/Daily log/Idea/Meeting/Reminder/Quick capture), and only a
-/// *long press* opens this sheet directly — that radial menu is
-/// dock/shell work (`app_shell.dart` already tracks the custom dock as
-/// its own follow-up) and isn't built. Until it is, the FAB opens Quick
-/// capture directly, as the closest single entry point to "capture
-/// something fast" without a menu to choose from first.
+/// **Reached from:** the dock's + button (`shell/app_dock.dart`) — either
+/// its "Quick capture" row in the "Add…" menu, or a long press on the +
+/// itself, which bypasses that menu entirely (matching the source's own
+/// 480ms hold-to-capture shortcut in `AppTabs.tsx`).
 Future<void> showCreateSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,

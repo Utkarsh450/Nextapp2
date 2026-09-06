@@ -125,16 +125,6 @@ void main() {
     expect(find.text('Renew passport'), findsNothing);
   });
 
-  testWidgets('tapping the FAB opens the Quick capture sheet', (tester) async {
-    await tester.pumpWidget(_wrap(const NotesListScreen()));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pumpAndSettle();
-
-    expect(find.text('QUICK CAPTURE'), findsOneWidget);
-  });
-
   testWidgets("tapping Today's log opens today's daily-log note", (
     tester,
   ) async {
