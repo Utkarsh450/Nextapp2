@@ -326,6 +326,73 @@ abstract class _$NoteLabelFilter extends $Notifier<String?> {
   }
 }
 
+/// `board.notebookId` — the Today dashboard's notebook tiles and (once
+/// built) the Notebooks library both drive this filter down into
+/// [visibleNoteListProvider].
+
+@ProviderFor(NoteNotebookFilter)
+final noteNotebookFilterProvider = NoteNotebookFilterProvider._();
+
+/// `board.notebookId` — the Today dashboard's notebook tiles and (once
+/// built) the Notebooks library both drive this filter down into
+/// [visibleNoteListProvider].
+final class NoteNotebookFilterProvider
+    extends $NotifierProvider<NoteNotebookFilter, String?> {
+  /// `board.notebookId` — the Today dashboard's notebook tiles and (once
+  /// built) the Notebooks library both drive this filter down into
+  /// [visibleNoteListProvider].
+  NoteNotebookFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'noteNotebookFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteNotebookFilterHash();
+
+  @$internal
+  @override
+  NoteNotebookFilter create() => NoteNotebookFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$noteNotebookFilterHash() =>
+    r'3ca7c79102105c43aa9cecba73545b30db73731b';
+
+/// `board.notebookId` — the Today dashboard's notebook tiles and (once
+/// built) the Notebooks library both drive this filter down into
+/// [visibleNoteListProvider].
+
+abstract class _$NoteNotebookFilter extends $Notifier<String?> {
+  String? build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<String?, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String?, String?>,
+              String?,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(NoteBoardLayoutController)
 final noteBoardLayoutControllerProvider = NoteBoardLayoutControllerProvider._();
 
@@ -423,7 +490,115 @@ final class VisibleNoteListProvider
   }
 }
 
-String _$visibleNoteListHash() => r'a7a5a902a6669e553a8fcd2710338b3c9ae3e17c';
+String _$visibleNoteListHash() => r'f37183ab02c3f629b5b163893294559242bb4345';
+
+/// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
+/// recomputed only when the notes or notebooks it depends on change.
+
+@ProviderFor(noteDashboardData)
+final noteDashboardDataProvider = NoteDashboardDataProvider._();
+
+/// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
+/// recomputed only when the notes or notebooks it depends on change.
+
+final class NoteDashboardDataProvider
+    extends
+        $FunctionalProvider<
+          dash.NoteDashboard,
+          dash.NoteDashboard,
+          dash.NoteDashboard
+        >
+    with $Provider<dash.NoteDashboard> {
+  /// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
+  /// recomputed only when the notes or notebooks it depends on change.
+  NoteDashboardDataProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'noteDashboardDataProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteDashboardDataHash();
+
+  @$internal
+  @override
+  $ProviderElement<dash.NoteDashboard> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  dash.NoteDashboard create(Ref ref) {
+    return noteDashboardData(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(dash.NoteDashboard value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<dash.NoteDashboard>(value),
+    );
+  }
+}
+
+String _$noteDashboardDataHash() => r'6415a054f0f5adff615db3ee45c4b0e2f70248f1';
+
+/// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
+/// has no active filter of any kind. `search` isn't modeled yet (no
+/// search screen), so it's left out of this gate until one exists.
+
+@ProviderFor(showTodayDashboard)
+final showTodayDashboardProvider = ShowTodayDashboardProvider._();
+
+/// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
+/// has no active filter of any kind. `search` isn't modeled yet (no
+/// search screen), so it's left out of this gate until one exists.
+
+final class ShowTodayDashboardProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
+  /// has no active filter of any kind. `search` isn't modeled yet (no
+  /// search screen), so it's left out of this gate until one exists.
+  ShowTodayDashboardProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'showTodayDashboardProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$showTodayDashboardHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return showTodayDashboard(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$showTodayDashboardHash() =>
+    r'26d84f694b46f3ace1e78866262a0d644aa016a9';
 
 @ProviderFor(noteLabelOptions)
 final noteLabelOptionsProvider = NoteLabelOptionsProvider._();

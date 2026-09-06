@@ -14,6 +14,7 @@ import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_labels.dart';
 import 'package:notes_app/features/notes/domain/notes_controller.dart';
 import 'package:notes_app/features/notes/presentation/note_card.dart';
+import 'package:notes_app/features/notes/presentation/today_dashboard.dart';
 
 /// Creates a blank note and jumps straight into its editor. Stands in for
 /// the source's dock "+" → quick-capture flow (`AppTabs.tsx`/
@@ -35,22 +36,20 @@ const List<(NoteFilter, String)> _filters = [
 ];
 
 /// Port of the Notes tab in `features/notes/NotesApp.tsx` +
-/// `NotesGrid.tsx`/`NoteCard.tsx` — the app's core screen (feature-audit #6).
+/// `NotesGrid.tsx`/`NoteCard.tsx` — the app's core screen (feature-audit #6),
+/// now including the Today dashboard (#5 — see `today_dashboard.dart`).
 ///
-/// **Scope note (this build):** `TodayBoard` (#5, shown only when no
-/// filters are active) and the reminders-due banner's tap target both stay
-/// out of this pass — Today is its own screen. The templates chip row and
-/// the "Today's log" quick-create chip are deferred until the note editor
-/// exists to receive them. The notebook "All notebooks" clear-chip has
-/// nowhere to be set from yet (no notebook picker built), so it's wired in
-/// state but never visible. All of this is called out again in the
-/// screen's completion notes, not silently dropped.
+/// **Scope note (this build):** the templates chip row and the "Today's
+/// log" quick-create chip are deferred until the note editor exists to
+/// receive them — called out again in the screen's completion notes, not
+/// silently dropped.
 class const NotesListScreen({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filterKey = ref.watch(noteFilterKeyProvider);
     final shown = ref.watch(visibleNoteListProvider);
     final reminders = ref.watch(upcomingNoteRemindersProvider);
+    final showToday = ref.watch(showTodayDashboardProvider);
     final spacing = Theme.of(context).extension<AppSpacing>()!;
 
     return Scaffold(
@@ -59,32 +58,54 @@ class const NotesListScreen({super.key}) extends ConsumerWidget {
         tooltip: 'New note',
         child: const Icon(Icons.add),
       ),
+      // A single CustomScrollView (rather than a fixed header Column with
+      // only the grid scrolling underneath) matches the source's
+      // whole-page scroll — and matters more than cosmetics here: once
+      // Today (with its progress/due/notebook sections) is showing, a
+      // fixed-height header could overflow on shorter screens. One scroll
+      // surface means the header content simply scrolls away instead.
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            const _HeaderRow(),
-            if (reminders.isNotEmpty && filterKey != NoteFilter.trash)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  spacing.lg,
-                  0,
-                  spacing.lg,
-                  spacing.sm,
+        child: RefreshIndicator(
+          // No real network sync exists yet (see
+          // docs/flutter-architecture.md §2 — the mutation queue is
+          // dropped), so "refresh" has nothing to fetch; the gesture is
+          // kept because it costs nothing and matches user expectation on
+          // a scrollable list.
+          onRefresh: () async {},
+          child: CustomScrollView(
+            key: const PageStorageKey('notes-list-scroll'),
+            slivers: [
+              const SliverToBoxAdapter(child: _HeaderRow()),
+              if (showToday) const SliverToBoxAdapter(child: TodayDashboard()),
+              if (!showToday &&
+                  reminders.isNotEmpty &&
+                  filterKey != NoteFilter.trash)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      spacing.lg,
+                      0,
+                      spacing.lg,
+                      spacing.sm,
+                    ),
+                    child: _ReminderBanner(reminders: reminders),
+                  ),
                 ),
-                child: _ReminderBanner(reminders: reminders),
-              ),
-            const _FilterChipRow(),
-            SizedBox(height: spacing.sm),
-            const _LabelChipRow(),
-            Expanded(
-              child: shown.isEmpty
-                  ? _NotesEmptyState(filterKey: filterKey)
-                  : _NotesResults(shown: shown),
-            ),
-            if (filterKey == NoteFilter.trash && shown.isNotEmpty)
-              const _EmptyTrashButton(),
-          ],
+              const SliverToBoxAdapter(child: _FilterChipRow()),
+              SliverToBoxAdapter(child: SizedBox(height: spacing.sm)),
+              const SliverToBoxAdapter(child: _LabelChipRow()),
+              if (shown.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _NotesEmptyState(filterKey: filterKey),
+                )
+              else
+                _NotesResultsSliver(shown: shown),
+              if (filterKey == NoteFilter.trash && shown.isNotEmpty)
+                const SliverToBoxAdapter(child: _EmptyTrashButton()),
+            ],
+          ),
         ),
       ),
     );
@@ -194,6 +215,7 @@ class const _FilterChipRow() extends ConsumerWidget {
     final filterKey = ref.watch(noteFilterKeyProvider);
     final colorFilter = ref.watch(noteColorFilterProvider);
     final labelFilter = ref.watch(noteLabelFilterProvider);
+    final notebookFilter = ref.watch(noteNotebookFilterProvider);
     final colors = ref.watch(noteColorOptionsProvider);
 
     return SizedBox(
@@ -209,6 +231,16 @@ class const _FilterChipRow() extends ConsumerWidget {
                 label: label,
                 selected: filterKey == key,
                 onTap: () => ref.read(noteFilterKeyProvider.notifier).set(key),
+              ),
+            ),
+          if (notebookFilter != null)
+            Padding(
+              padding: EdgeInsets.only(right: spacing.sm),
+              child: _Chip(
+                label: 'All notebooks',
+                selected: false,
+                onTap: () =>
+                    ref.read(noteNotebookFilterProvider.notifier).set(null),
               ),
             ),
           for (final color in colors)
@@ -302,16 +334,15 @@ class const _NotesEmptyState({required final NoteFilter filterKey})
   }
 }
 
-class const _NotesResults({required final List<Note> shown})
+class const _NotesResultsSliver({required final List<Note> shown})
     extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final spacing = Theme.of(context).extension<AppSpacing>()!;
     final layout = ref.watch(noteBoardLayoutControllerProvider);
     final controller = ref.read(notesControllerProvider.notifier);
-    final padding = EdgeInsets.symmetric(
-      horizontal: spacing.lg,
-    ).copyWith(bottom: spacing.xxl);
+    final padding = EdgeInsets.symmetric(horizontal: spacing.lg)
+        .copyWith(bottom: spacing.xxl);
 
     Widget buildCard(BuildContext context, int index) {
       final note = shown[index];
@@ -337,27 +368,23 @@ class const _NotesResults({required final List<Note> shown})
       );
     }
 
-    // No real network sync exists yet (see docs/flutter-architecture.md §2
-    // — the mutation queue is dropped), so "refresh" has nothing to fetch;
-    // the gesture is kept because it costs nothing and matches user
-    // expectation on a scrollable list.
-    return RefreshIndicator(
-      onRefresh: () async {},
-      child: layout == NoteBoardLayout.masonry
-          ? MasonryGridView.count(
-              padding: padding,
+    return SliverPadding(
+      padding: padding,
+      sliver: layout == NoteBoardLayout.masonry
+          ? SliverMasonryGrid.count(
               crossAxisCount: 2,
               mainAxisSpacing: spacing.sm,
               crossAxisSpacing: spacing.sm,
-              itemCount: shown.length,
+              childCount: shown.length,
               itemBuilder: buildCard,
             )
-          : ListView.separated(
-              padding: padding,
-              itemCount: shown.length,
-              separatorBuilder: (context, index) =>
-                  SizedBox(height: spacing.sm),
-              itemBuilder: buildCard,
+          : SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => index.isOdd
+                    ? SizedBox(height: spacing.sm)
+                    : buildCard(context, index ~/ 2),
+                childCount: shown.isEmpty ? 0 : shown.length * 2 - 1,
+              ),
             ),
     );
   }

@@ -93,6 +93,18 @@ String insertImageMarkdown(String body, String src, [String alt = 'image']) {
   return '$prefix![$alt]($src)';
 }
 
+/// Task-checkbox totals for one body — matches `checklistProgress`.
+class const ChecklistProgress({
+  required final int total,
+  required final int done,
+});
+
+ChecklistProgress checklistProgress(String body) {
+  final tasks = RegExp(r'^\s*- \[[ xX]\]', multiLine: true).allMatches(body);
+  final done = RegExp(r'^\s*- \[[xX]\]', multiLine: true).allMatches(body);
+  return ChecklistProgress(total: tasks.length, done: done.length);
+}
+
 /// Matches `wordCount`.
 int wordCount(String text) {
   final words = RegExp(r'\S+').allMatches(text.trim());

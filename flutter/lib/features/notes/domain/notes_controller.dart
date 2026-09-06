@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:notes_app/core/theme/tokens/note_swatches.dart';
+import 'package:notes_app/features/notebooks/domain/notebooks_controller.dart';
 import 'package:notes_app/features/notes/domain/note.dart';
+import 'package:notes_app/features/notes/domain/note_dashboard.dart' as dash;
 import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_markdown.dart';
 import 'package:notes_app/features/notes/domain/note_reminders.dart';
@@ -24,7 +26,8 @@ class NotesController extends _$NotesController {
 
   void _patch(int id, Note Function(Note note) update) {
     state = [
-      for (final note in state) if (note.id == id) update(note) else note,
+      for (final note in state)
+        if (note.id == id) update(note) else note,
     ];
   }
 
@@ -82,14 +85,16 @@ class NotesController extends _$NotesController {
   /// `deleteForever`.
   void deleteForever(int id) {
     state = [
-      for (final note in state) if (note.id != id) note,
+      for (final note in state)
+        if (note.id != id) note,
     ];
   }
 
   /// `emptyTrash`.
   void emptyTrash() {
     state = [
-      for (final note in state) if (note.trashedAt == null) note,
+      for (final note in state)
+        if (note.trashedAt == null) note,
     ];
   }
 
@@ -143,7 +148,10 @@ class NotesController extends _$NotesController {
     );
     final exists = state.any((n) => n.id == stamped.id);
     state = exists
-        ? [for (final n in state) if (n.id == stamped.id) stamped else n]
+        ? [
+            for (final n in state)
+              if (n.id == stamped.id) stamped else n,
+          ]
         : [stamped, ...state];
     return stamped;
   }
@@ -166,25 +174,26 @@ class NotesController extends _$NotesController {
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     final ownerEmail = state.firstOrNull?.ownerEmail ?? 'you@notes.dev';
-    final blank = Note(
-      id: now,
-      ownerEmail: ownerEmail,
-      title: title,
-      tag: tag,
-      body: body,
-      notebookId: notebookId ?? 'inbox',
-      notebook: notebook ?? 'Inbox',
-      color: color ?? _randomNoteColor(),
-      labels: labels,
-      createdAt: now,
-      updatedAt: now,
-    ).withReminder(
-      resolveReminderFields(
-        dueAt: dueAt,
-        dueTime: dueTime,
-        alertMinutes: alertMinutes,
-      ),
-    );
+    final blank =
+        Note(
+          id: now,
+          ownerEmail: ownerEmail,
+          title: title,
+          tag: tag,
+          body: body,
+          notebookId: notebookId ?? 'inbox',
+          notebook: notebook ?? 'Inbox',
+          color: color ?? _randomNoteColor(),
+          labels: labels,
+          createdAt: now,
+          updatedAt: now,
+        ).withReminder(
+          resolveReminderFields(
+            dueAt: dueAt,
+            dueTime: dueTime,
+            alertMinutes: alertMinutes,
+          ),
+        );
     return saveNote(blank);
   }
 
@@ -250,6 +259,19 @@ class NoteLabelFilter extends _$NoteLabelFilter {
   void set(String? value) => state = value;
 }
 
+/// `board.notebookId` — the Today dashboard's notebook tiles and (once
+/// built) the Notebooks library both drive this filter down into
+/// [visibleNoteListProvider].
+@riverpod
+class NoteNotebookFilter extends _$NoteNotebookFilter {
+  @override
+  String? build() => null;
+
+  // See theme_controller.dart's `setSkin` for why this stays a method.
+  // ignore: use_setters_to_change_properties
+  void set(String? value) => state = value;
+}
+
 /// `AccountPanel`'s board-layout toggle. In-memory only for now — the
 /// source persists this via `lib/theme.ts`'s `LAYOUT_KEY`; that lands once
 /// `Prefs` is wired up.
@@ -277,8 +299,28 @@ List<Note> visibleNoteList(Ref ref) {
     filterKey: ref.watch(noteFilterKeyProvider),
     label: ref.watch(noteLabelFilterProvider),
     color: ref.watch(noteColorFilterProvider),
+    notebookId: ref.watch(noteNotebookFilterProvider),
   );
 }
+
+/// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
+/// recomputed only when the notes or notebooks it depends on change.
+@riverpod
+dash.NoteDashboard noteDashboardData(Ref ref) {
+  final notes = ref.watch(notesControllerProvider);
+  final notebooks = ref.watch(notebooksControllerProvider);
+  return dash.noteDashboard(notes, notebooks);
+}
+
+/// `showToday` in `NotesApp.tsx` — Today is shown only when the notes tab
+/// has no active filter of any kind. `search` isn't modeled yet (no
+/// search screen), so it's left out of this gate until one exists.
+@riverpod
+bool showTodayDashboard(Ref ref) =>
+    ref.watch(noteFilterKeyProvider) == NoteFilter.all &&
+    ref.watch(noteNotebookFilterProvider) == null &&
+    ref.watch(noteLabelFilterProvider) == null &&
+    ref.watch(noteColorFilterProvider) == null;
 
 @riverpod
 List<String> noteLabelOptions(Ref ref) =>
