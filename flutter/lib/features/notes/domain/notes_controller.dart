@@ -8,6 +8,7 @@ import 'package:notes_app/features/notes/domain/note_dashboard.dart' as dash;
 import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_markdown.dart';
 import 'package:notes_app/features/notes/domain/note_reminders.dart';
+import 'package:notes_app/features/notes/domain/note_templates.dart';
 import 'package:notes_app/features/notes/domain/sample_notes.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -200,6 +201,26 @@ class NotesController extends _$NotesController {
   String _randomNoteColor() {
     const palette = NoteSwatches.paletteHex;
     return palette[Random().nextInt(palette.length)];
+  }
+
+  /// `createFromTemplate` — starts a new note from one of the three
+  /// built-in templates (Quick capture, feature-audit #9).
+  Note createFromTemplate(TemplateKey key) {
+    final template = applyTemplate(key);
+    return createBlank(
+      title: template.title,
+      tag: template.tag,
+      body: template.body,
+      notebookId: template.notebookId,
+      notebook: template.notebook,
+    );
+  }
+
+  /// `openDailyNote` — reuses today's daily log if one already exists,
+  /// otherwise starts a fresh one from the `daily` template.
+  Note openDailyNote() {
+    final existing = findDailyNote(state);
+    return existing ?? createFromTemplate(TemplateKey.daily);
   }
 
   /// `reorder` — drag-to-reorder is a decided real feature per

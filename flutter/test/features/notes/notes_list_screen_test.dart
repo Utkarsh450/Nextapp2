@@ -125,6 +125,38 @@ void main() {
     expect(find.text('Renew passport'), findsNothing);
   });
 
+  testWidgets('tapping the FAB opens the Quick capture sheet', (tester) async {
+    await tester.pumpWidget(_wrap(const NotesListScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    expect(find.text('QUICK CAPTURE'), findsOneWidget);
+  });
+
+  testWidgets("tapping Today's log opens today's daily-log note", (
+    tester,
+  ) async {
+    late ProviderContainer container;
+    await tester.pumpWidget(
+      _wrap(const NotesListScreen(), (c) => container = c),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("Today's log"));
+    await tester.pumpAndSettle();
+
+    // Navigated away from the notes list into the (stubbed) editor route.
+    expect(find.text('Notes'), findsNothing);
+    expect(
+      container.read(notesControllerProvider).any((n) => n.tag == 'Daily'),
+      isTrue,
+    );
+  });
+
   testWidgets('tapping the Today "Due today" chip switches the filter', (
     tester,
   ) async {

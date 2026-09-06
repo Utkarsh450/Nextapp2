@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/features/notes/domain/note_filters.dart';
+import 'package:notes_app/features/notes/domain/note_templates.dart';
 import 'package:notes_app/features/notes/domain/notes_controller.dart';
 
 void main() {
@@ -27,10 +28,7 @@ void main() {
     container.read(notesControllerProvider.notifier).togglePin(unpinned.id);
 
     final shown = container.read(visibleNoteListProvider);
-    expect(
-      shown.firstWhere((n) => n.id == unpinned.id).pinned,
-      isTrue,
-    );
+    expect(shown.firstWhere((n) => n.id == unpinned.id).pinned, isTrue);
     final lastPinnedIndex = shown.lastIndexWhere((n) => n.pinned);
     final firstUnpinnedIndex = shown.indexWhere((n) => !n.pinned);
     // Every pinned note (including the one just pinned) sorts ahead of
@@ -44,9 +42,7 @@ void main() {
 
   test('moveToTrash then restoreTrashed round-trips through both filters', () {
     final notes = container.read(notesControllerProvider);
-    final target = notes.firstWhere(
-      (n) => n.trashedAt == null && !n.archived,
-    );
+    final target = notes.firstWhere((n) => n.trashedAt == null && !n.archived);
     final notifier = container.read(notesControllerProvider.notifier);
 
     // Not a cascade: this reads its own state back through the container
@@ -97,6 +93,30 @@ void main() {
     expect(copy.id, isNot(pinnedSource.id));
     expect(copy.pinned, isFalse);
     expect(copy.title, '${pinnedSource.title} copy');
+  });
+
+  test(
+    'createFromTemplate seeds title/tag/body/notebook from the template',
+    () {
+      final note = container
+          .read(notesControllerProvider.notifier)
+          .createFromTemplate(TemplateKey.meeting);
+      expect(note.title, 'Meeting notes');
+      expect(note.tag, 'Work');
+      expect(note.notebookId, 'work');
+      expect(note.body, contains('## Attendees'));
+    },
+  );
+
+  test('openDailyNote creates once, then reuses the same note', () {
+    final notifier = container.read(notesControllerProvider.notifier);
+    final first = notifier.openDailyNote();
+    final second = notifier.openDailyNote();
+    expect(second.id, first.id);
+    expect(
+      container.read(notesControllerProvider).where((n) => n.id == first.id),
+      hasLength(1),
+    );
   });
 
   test('filter chips actually change what visibleNoteList returns', () {

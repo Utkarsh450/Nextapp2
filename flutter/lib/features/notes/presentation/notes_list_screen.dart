@@ -13,14 +13,14 @@ import 'package:notes_app/features/notes/domain/note.dart';
 import 'package:notes_app/features/notes/domain/note_filters.dart';
 import 'package:notes_app/features/notes/domain/note_labels.dart';
 import 'package:notes_app/features/notes/domain/notes_controller.dart';
+import 'package:notes_app/features/notes/presentation/create_sheet.dart';
 import 'package:notes_app/features/notes/presentation/note_card.dart';
 import 'package:notes_app/features/notes/presentation/today_dashboard.dart';
 
-/// Creates a blank note and jumps straight into its editor. Stands in for
-/// the source's dock "+" → quick-capture flow (`AppTabs.tsx`/
-/// `CreateSheet.tsx`, feature-audit #9) — that dock isn't built yet, so
-/// this FAB/empty-state action is the one entry point into note creation
-/// for now.
+/// Creates a blank note and jumps straight into its editor — used by the
+/// empty state's "Write your first note" action, matching the source's
+/// own direct-create `AddAction`s (as opposed to the FAB, which opens
+/// Quick capture — see `create_sheet.dart`'s doc comment).
 void _createAndEdit(BuildContext context, WidgetRef ref) {
   final note = ref.read(notesControllerProvider.notifier).createBlank();
   unawaited(context.push('/notes/${note.id}/edit'));
@@ -37,12 +37,9 @@ const List<(NoteFilter, String)> _filters = [
 
 /// Port of the Notes tab in `features/notes/NotesApp.tsx` +
 /// `NotesGrid.tsx`/`NoteCard.tsx` — the app's core screen (feature-audit #6),
-/// now including the Today dashboard (#5 — see `today_dashboard.dart`).
-///
-/// **Scope note (this build):** the templates chip row and the "Today's
-/// log" quick-create chip are deferred until the note editor exists to
-/// receive them — called out again in the screen's completion notes, not
-/// silently dropped.
+/// now including the Today dashboard (#5 — see `today_dashboard.dart`) and
+/// the "Today's log" quick-create chip (backed by
+/// `NotesController.openDailyNote`).
 class const NotesListScreen({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,7 +51,7 @@ class const NotesListScreen({super.key}) extends ConsumerWidget {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _createAndEdit(context, ref),
+        onPressed: () => showCreateSheet(context),
         tooltip: 'New note',
         child: const Icon(Icons.add),
       ),
@@ -241,6 +238,20 @@ class const _FilterChipRow() extends ConsumerWidget {
                 selected: false,
                 onTap: () =>
                     ref.read(noteNotebookFilterProvider.notifier).set(null),
+              ),
+            ),
+          if (filterKey != NoteFilter.trash)
+            Padding(
+              padding: EdgeInsets.only(right: spacing.sm),
+              child: _Chip(
+                label: "Today's log",
+                selected: false,
+                onTap: () {
+                  final note = ref
+                      .read(notesControllerProvider.notifier)
+                      .openDailyNote();
+                  unawaited(context.push('/notes/${note.id}/edit'));
+                },
               ),
             ),
           for (final color in colors)
