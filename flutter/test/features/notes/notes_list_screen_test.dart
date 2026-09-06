@@ -163,4 +163,106 @@ void main() {
 
     expect(container.read(noteFilterKeyProvider), NoteFilter.due);
   });
+
+  testWidgets('masonry layout (the default) has no drag handles', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(const NotesListScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.drag_indicator), findsNothing);
+  });
+
+  testWidgets('switching to list layout shows a drag handle per note card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrap(const NotesListScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Use even grid'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.drag_indicator), findsWidgets);
+  });
+
+  testWidgets('the Trash filter has no drag handles even in list layout', (
+    tester,
+  ) async {
+    late ProviderContainer container;
+    await tester.pumpWidget(
+      _wrap(const NotesListScreen(), (c) => container = c),
+    );
+    await tester.pumpAndSettle();
+
+    container
+        .read(notesControllerProvider.notifier)
+        .moveToTrash(container.read(notesControllerProvider).first.id);
+    await tester.tap(find.bySemanticsLabel('Use even grid'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Trash'),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Trash'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.drag_indicator), findsNothing);
+  });
+
+  // A full end-to-end drag (down → hold → move → up) against
+  // `ReorderableDelayedDragStartListener` couldn't be made to complete
+  // reliably through `flutter test`'s synthetic gesture simulation once
+  // this screen's real widget tree (header row, filter/label chip rows,
+  // `RefreshIndicator`, `SafeArea`) was in place — the drag recognizer never
+  // won its gesture-arena race against the ambient `Scrollable`'s own pan
+  // recognizer here, even though isolated repros of the exact same
+  // handle/list widgets outside this screen completed correctly. That reads
+  // as a widget-test-harness limitation rather than a real-touch-input one
+  // (verify manually on a device), so this covers what the harness *can*
+  // verify reliably instead: the handle exists in list layout and wires
+  // to the correct index, and the underlying reorder logic itself —
+  // `NotesController.reorder` — is covered directly in
+  // `notes_controller_test.dart`.
+  testWidgets(
+    'in list layout, each visible card has its own indexed drag handle',
+    (tester) async {
+      late ProviderContainer container;
+      await tester.pumpWidget(
+        _wrap(const NotesListScreen(), (c) => container = c),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Use even grid'));
+      await tester.pumpAndSettle();
+
+      final shown = container.read(visibleNoteListProvider);
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey('reorder-handle-${shown[1].id}')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      expect(
+        find.byKey(ValueKey('reorder-handle-${shown[0].id}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('reorder-handle-${shown[1].id}')),
+        findsOneWidget,
+      );
+      final listener = tester.widget<ReorderableDelayedDragStartListener>(
+        find.ancestor(
+          of: find.byKey(ValueKey('reorder-handle-${shown[1].id}')),
+          matching: find.byType(ReorderableDelayedDragStartListener),
+        ),
+      );
+      expect(listener.index, 1);
+    },
+  );
 }

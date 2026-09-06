@@ -128,4 +128,21 @@ void main() {
     final allShown = container.read(visibleNoteListProvider);
     expect(allShown.any((n) => n.archived), isFalse);
   });
+
+  test('reorder moves the dragged note next to its target and the new order '
+      'is what visibleNoteList (default "newest" sort) actually shows', () {
+    // Note id 1 is seeded pinned, so it always sorts first regardless of
+    // `order` — this drags the first *pair of unpinned* notes instead.
+    final before = container.read(visibleNoteListProvider);
+    expect(before[0].pinned, isTrue);
+    final fromId = before[1].id;
+    final toId = before[2].id;
+
+    container.read(notesControllerProvider.notifier).reorder(fromId, toId);
+
+    final after = container.read(visibleNoteListProvider);
+    expect(after[0].id, before[0].id);
+    expect(after[1].id, toId);
+    expect(after[2].id, fromId);
+  });
 }

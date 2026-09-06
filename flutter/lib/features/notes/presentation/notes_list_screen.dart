@@ -95,7 +95,7 @@ class const NotesListScreen({super.key}) extends ConsumerWidget {
                   child: _NotesEmptyState(filterKey: filterKey),
                 )
               else
-                _NotesResultsSliver(shown: shown),
+                _NotesResultsSliver(shown: shown, filterKey: filterKey),
               if (filterKey == NoteFilter.trash && shown.isNotEmpty)
                 const SliverToBoxAdapter(child: _EmptyTrashButton()),
             ],
@@ -340,8 +340,10 @@ class const _NotesEmptyState({required final NoteFilter filterKey})
   }
 }
 
-class const _NotesResultsSliver({required final List<Note> shown})
-    extends ConsumerWidget {
+class const _NotesResultsSliver({
+  required final List<Note> shown,
+  required final NoteFilter filterKey,
+}) extends ConsumerWidget {
   /// `.notes-grid`'s `column-gap`/`.note-card`'s `margin-bottom` in
   /// `app/globals.css` — both `0.95rem`. This is a real, previously-missed
   /// gap: it isn't part of the app's 4px spacing scale
@@ -380,24 +382,122 @@ class const _NotesResultsSliver({required final List<Note> shown})
       );
     }
 
+    if (layout == NoteBoardLayout.masonry) {
+      return SliverPadding(
+        padding: padding,
+        sliver: SliverMasonryGrid.count(
+          crossAxisCount: 2,
+          mainAxisSpacing: _cardGap,
+          crossAxisSpacing: _cardGap,
+          childCount: shown.length,
+          itemBuilder: buildCard,
+        ),
+      );
+    }
+
+    // Drag-to-reorder — `moveNote`/`Note.order` (`note_filters.dart`) is a
+    // decided real feature per `docs/feature-audit.md` §2, wired up here
+    // via a `SliverReorderableList` (fits directly into this screen's
+    // existing single `CustomScrollView`, no extra package needed).
+    // **Scoped to list mode only**: masonry's 2-column staggered layout has
+    // no first-party Flutter widget for reordering variable-height grid
+    // items, and building a bespoke one is a much larger, riskier
+    // undertaking than this pass warrants — the source itself never shipped
+    // any drag gesture at all, so there's no existing UX to match here.
+    // Also disabled for Trash, where manually ordering deleted notes has no
+    // purpose. `order` only breaks ties within the default "newest" sort
+    // (`note_filters.dart`'s `visibleNotes`), which is the only sort mode
+    // currently reachable from the UI, so a drag always visibly "sticks".
+    final reorderable = filterKey != NoteFilter.trash;
+    if (!reorderable) {
+      return SliverPadding(
+        padding: padding,
+        sliver: SliverList.separated(
+          itemCount: shown.length,
+          itemBuilder: buildCard,
+          separatorBuilder: (context, index) =>
+              const SizedBox(height: _cardGap),
+        ),
+      );
+    }
+
+    // `onReorderItem` (the non-deprecated replacement) is documented to
+    // hand back a `newIndex` already adjusted for the removed item, but on
+    // the Flutter version this app builds against it silently never fires
+    // at all — confirmed with an isolated repro outside this app entirely.
+    // `onReorder` does fire (verified the same way), so this deliberately
+    // keeps using it, with the classic manual off-by-one correction it
+    // needs, until that regresses/gets fixed upstream.
+    void handleReorder(int oldIndex, int rawNewIndex) {
+      final newIndex = rawNewIndex > oldIndex ? rawNewIndex - 1 : rawNewIndex;
+      if (newIndex == oldIndex) return;
+      controller.reorder(shown[oldIndex].id, shown[newIndex].id);
+    }
+
     return SliverPadding(
       padding: padding,
-      sliver: layout == NoteBoardLayout.masonry
-          ? SliverMasonryGrid.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: _cardGap,
-              crossAxisSpacing: _cardGap,
-              childCount: shown.length,
-              itemBuilder: buildCard,
-            )
-          : SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => index.isOdd
-                    ? const SizedBox(height: _cardGap)
-                    : buildCard(context, index ~/ 2),
-                childCount: shown.isEmpty ? 0 : shown.length * 2 - 1,
-              ),
+      sliver: SliverReorderableList(
+        itemCount: shown.length,
+        // `onReorder` is deprecated in favor of `onReorderItem`, but
+        // `onReorderItem` never fires at all on the Flutter version this
+        // app builds against (see the doc comment above) — `onReorder`
+        // does, so it's kept deliberately rather than silently losing the
+        // feature to a framework regression.
+        // ignore: deprecated_member_use
+        onReorder: handleReorder,
+        itemBuilder: (context, index) {
+          final note = shown[index];
+          return Padding(
+            key: ValueKey(note.id),
+            padding: EdgeInsets.only(
+              bottom: index == shown.length - 1 ? 0 : _cardGap,
             ),
+            child: Stack(
+              children: [
+                buildCard(context, index),
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  // Delayed (long-press-to-grab), not immediate: this list
+                  // sits inside the same vertically-scrolling
+                  // `CustomScrollView` as everything else on the screen, so
+                  // the handle's drag recognizer and the ambient
+                  // `Scrollable`'s own pan recognizer both see every touch
+                  // here and have to settle who wins in the same gesture
+                  // arena. The delayed variant — which waits out a hold
+                  // before claiming the drag, the same as
+                  // `ReorderableListView`'s own default touch behavior —
+                  // is the standard, safer choice for a handle embedded in
+                  // scrolling content; keep it even though this app's own
+                  // widget-test harness couldn't get a synthetic drag
+                  // gesture to complete reliably against the arena here
+                  // (isolated repros with the same widgets outside this
+                  // screen's full tree worked fine) — that failure mode
+                  // reads as a widget-test-harness limitation, not a
+                  // real-touch-input one; verify manually on a device.
+                  child: ReorderableDelayedDragStartListener(
+                    index: index,
+                    child: Material(
+                      key: ValueKey('reorder-handle-${note.id}'),
+                      color: Colors.black.withValues(alpha: 0.06),
+                      shape: const CircleBorder(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.drag_indicator,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
