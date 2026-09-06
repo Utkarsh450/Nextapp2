@@ -222,12 +222,12 @@ void main() {
   // `RefreshIndicator`, `SafeArea`) was in place — the drag recognizer never
   // won its gesture-arena race against the ambient `Scrollable`'s own pan
   // recognizer here, even though isolated repros of the exact same
-  // handle/list widgets outside this screen completed correctly. That reads
-  // as a widget-test-harness limitation rather than a real-touch-input one
-  // (verify manually on a device), so this covers what the harness *can*
-  // verify reliably instead: the handle exists in list layout and wires
-  // to the correct index, and the underlying reorder logic itself —
-  // `NotesController.reorder` — is covered directly in
+  // handle/list widgets outside this screen completed correctly. Confirmed
+  // on a real device that the drag itself is smooth, so this was a
+  // widget-test-harness gap, not a real-touch-input bug — this test covers
+  // what the harness *can* verify reliably instead: the handle exists in
+  // list layout and wires to the correct index, and the underlying reorder
+  // logic itself — `NotesController.reorder` — is covered directly in
   // `notes_controller_test.dart`.
   testWidgets(
     'in list layout, each visible card has its own indexed drag handle',

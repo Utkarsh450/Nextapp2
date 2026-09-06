@@ -468,13 +468,14 @@ class const _NotesResultsSliver({
                   // before claiming the drag, the same as
                   // `ReorderableListView`'s own default touch behavior —
                   // is the standard, safer choice for a handle embedded in
-                  // scrolling content; keep it even though this app's own
-                  // widget-test harness couldn't get a synthetic drag
-                  // gesture to complete reliably against the arena here
-                  // (isolated repros with the same widgets outside this
-                  // screen's full tree worked fine) — that failure mode
-                  // reads as a widget-test-harness limitation, not a
-                  // real-touch-input one; verify manually on a device.
+                  // scrolling content. This app's own widget-test harness
+                  // couldn't get a synthetic drag gesture to complete
+                  // reliably against the arena here (isolated repros with
+                  // the same widgets outside this screen's full tree worked
+                  // fine) — confirmed on a real device that the drag itself
+                  // is smooth, so that was a widget-test-harness gap, not a
+                  // real-touch-input bug (see `notes_list_screen_test.dart`
+                  // for what the harness covers instead).
                   child: ReorderableDelayedDragStartListener(
                     index: index,
                     child: Material(
