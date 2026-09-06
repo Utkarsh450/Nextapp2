@@ -36,3 +36,14 @@ bool isOverdue(String? dueAt, [String? today]) {
   final t = today ?? todayIso();
   return dueAt.compareTo(t) < 0;
 }
+
+/// Adds [days] (negative to subtract) to an ISO date string. Actually from
+/// `lib/notes/agenda.ts` (`shiftISO`), not `dates.ts` — kept here since
+/// it's a small, generic date utility and `agenda.ts` itself isn't ported
+/// (the agenda/Plan feature, audit #12, is out of scope for the habit
+/// tracker build — see `habits_board.dart`'s doc comment).
+String shiftIso(String iso, int days) {
+  final parts = iso.split('-').map(int.parse).toList();
+  final shifted = DateTime(parts[0], parts[1], parts[2] + days);
+  return todayIso(shifted);
+}
