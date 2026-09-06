@@ -612,7 +612,7 @@ final class SearchHitsProvider
   }
 }
 
-String _$searchHitsHash() => r'cdf2b69d434ff41d2a48750b97514b35d999f677';
+String _$searchHitsHash() => r'2092414b4550ed742b0032d758d55fe417404572';
 
 /// `dash` in `NotesApp.tsx` — the Today dashboard's aggregate summary,
 /// recomputed only when the notes or notebooks it depends on change.

@@ -8,22 +8,22 @@ part of 'search_history_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves
-/// [query] to the front of [recents], de-duplicating, capped at
+/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves a
+/// query to the front of the recents list, de-duplicating, capped at
 /// [searchRecentsLimit]. **In-memory only**, matching every other
 /// controller in this build; the source persists this to a `Prefs` row.
 
 @ProviderFor(SearchHistoryController)
 final searchHistoryControllerProvider = SearchHistoryControllerProvider._();
 
-/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves
-/// [query] to the front of [recents], de-duplicating, capped at
+/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves a
+/// query to the front of the recents list, de-duplicating, capped at
 /// [searchRecentsLimit]. **In-memory only**, matching every other
 /// controller in this build; the source persists this to a `Prefs` row.
 final class SearchHistoryControllerProvider
     extends $NotifierProvider<SearchHistoryController, List<String>> {
-  /// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves
-  /// [query] to the front of [recents], de-duplicating, capped at
+  /// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves a
+  /// query to the front of the recents list, de-duplicating, capped at
   /// [searchRecentsLimit]. **In-memory only**, matching every other
   /// controller in this build; the source persists this to a `Prefs` row.
   SearchHistoryControllerProvider._()
@@ -56,8 +56,8 @@ final class SearchHistoryControllerProvider
 String _$searchHistoryControllerHash() =>
     r'716915bc29987cfcc271acf321388cfa1d214512';
 
-/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves
-/// [query] to the front of [recents], de-duplicating, capped at
+/// Direct port of `rememberSearch` (`lib/notes/storage.ts`) — moves a
+/// query to the front of the recents list, de-duplicating, capped at
 /// [searchRecentsLimit]. **In-memory only**, matching every other
 /// controller in this build; the source persists this to a `Prefs` row.
 
